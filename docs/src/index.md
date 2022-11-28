@@ -4,7 +4,7 @@ CurrentModule = PlantMeteo
 
 # PlantMeteo
 
-Documentation for [PlantMeteo](https://github.com/VEZY/PlantMeteo.jl).
+Documentation for [PlantMeteo](https://github.com/PalmStudio/PlantMeteo.jl).
 
 ```@index
 ```
