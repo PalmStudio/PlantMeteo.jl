@@ -1,6 +1,7 @@
 using PlantMeteo
 using Test
+using Dates
 
-@testset "PlantMeteo.jl" begin
-    # Write your tests here.
+@testset "Atmosphere" begin
+    include("test-atmosphere.jl")
 end
