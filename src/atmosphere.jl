@@ -17,6 +17,7 @@ Atmosphere structure to hold all values related to the meteorology / atmosphere.
 - `P = 101.325` (kPa): air pressure. The default value is at 1 atm, *i.e.* the mean sea-level
 atmospheric pressure on Earth.
 - `Rh = rh_from_vpd(VPD,eₛ)` (0-1): relative humidity
+- `Precipitations=0.0` (mm): precipitations from atmosphere (*i.e.* rain, snow, hail, etc.)
 - `Cₐ` (ppm): air CO₂ concentration
 - `e = vapor_pressure(T,Rh)` (kPa): vapor pressure
 - `eₛ = e_sat(T)` (kPa): saturated vapor pressure
@@ -51,6 +52,7 @@ struct Atmosphere{A,D1,D2} <: AbstractAtmosphere
     Wind::A
     P::A
     Rh::A
+    Precipitations::A
     Cₐ::A
     e::A
     eₛ::A
@@ -70,6 +72,7 @@ end
 
 function Atmosphere(;
     T, Wind, Rh, date=Dates.now(), duration=1.0, P=101.325,
+    Precipitations=0.0,
     Cₐ=400.0, e=vapor_pressure(T, Rh), eₛ=e_sat(T), VPD=eₛ - e,
     ρ=air_density(T, P), λ=latent_heat_vaporization(T),
     γ=psychrometer_constant(P, λ), ε=atmosphere_emissivity(T, e),
@@ -102,7 +105,8 @@ function Atmosphere(;
 
     param_A =
         promote(
-            T, Wind, P, Rh, Cₐ, e, eₛ, VPD, ρ, λ, γ, ε, Δ, clearness, Ri_SW_f, Ri_PAR_f,
+            T, Wind, P, Rh, Precipitations, Cₐ, e, eₛ, VPD, ρ, λ, γ,
+            ε, Δ, clearness, Ri_SW_f, Ri_PAR_f,
             Ri_NIR_f, Ri_TIR_f, Ri_custom_f
         )
 
