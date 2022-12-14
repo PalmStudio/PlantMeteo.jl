@@ -45,30 +45,13 @@ and either let at their default value or automatically computed using the functi
 Atmosphere(T = 20.0, Wind = 1.0, P = 101.3, Rh = 0.65)
 ```
 """
-struct Atmosphere{A,D1,D2} <: AbstractAtmosphere
-    date::D1
-    duration::D2
-    T::A
-    Wind::A
-    P::A
-    Rh::A
-    Precipitations::A
-    Cₐ::A
-    e::A
-    eₛ::A
-    VPD::A
-    ρ::A
-    λ::A
-    γ::A
-    ε::A
-    Δ::A
-    clearness::A
-    Ri_SW_f::A
-    Ri_PAR_f::A
-    Ri_NIR_f::A
-    Ri_TIR_f::A
-    Ri_custom_f::A
+struct Atmosphere{N,T<:Tuple} <: AbstractAtmosphere
+    nt::NamedTuple{N,T}
 end
+
+# function Atmosphere(nt::NamedTuple{names}) where {names}
+#     Atmosphere{names}(nt)
+# end
 
 function Atmosphere(;
     T, Wind, Rh, date=Dates.now(), duration=1.0, P=101.325,
@@ -77,7 +60,9 @@ function Atmosphere(;
     ρ=air_density(T, P), λ=latent_heat_vaporization(T),
     γ=psychrometer_constant(P, λ), ε=atmosphere_emissivity(T, e),
     Δ=e_sat_slope(T), clearness=9999.9, Ri_SW_f=9999.9, Ri_PAR_f=9999.9,
-    Ri_NIR_f=9999.9, Ri_TIR_f=9999.9, Ri_custom_f=9999.9)
+    Ri_NIR_f=9999.9, Ri_TIR_f=9999.9, Ri_custom_f=9999.9,
+    args...
+)
 
     # Checking some values:
     if Wind <= 0
@@ -103,12 +88,48 @@ function Atmosphere(;
         @error "clearness should always be 0 < clearness < 1"
     end
 
-    param_A =
-        promote(
-            T, Wind, P, Rh, Precipitations, Cₐ, e, eₛ, VPD, ρ, λ, γ,
-            ε, Δ, clearness, Ri_SW_f, Ri_PAR_f,
-            Ri_NIR_f, Ri_TIR_f, Ri_custom_f
+    params_same_type =
+        (;
+            T=T,
+            Wind=Wind,
+            P=P,
+            Rh=Rh,
+            Precipitations=Precipitations,
+            Cₐ=Cₐ,
+            e=e,
+            eₛ=eₛ,
+            VPD=VPD,
+            ρ=ρ,
+            λ=λ,
+            γ=γ,
+            ε=ε,
+            Δ=Δ,
+            clearness=clearness,
+            Ri_SW_f=Ri_SW_f,
+            Ri_PAR_f=Ri_PAR_f,
+            Ri_NIR_f=Ri_NIR_f,
+            Ri_TIR_f=Ri_TIR_f,
+            Ri_custom_f=Ri_custom_f
         )
 
-    Atmosphere(date, duration, param_A...)
+    Atmosphere(
+        (;
+        date=date,
+        duration=duration,
+        # We promote the types that we know should share the same type:
+        zip(keys(params_same_type), promote(values(params_same_type)...))...,
+        args...)
+    )
 end
+
+Base.keys(::Atmosphere{names}) where {names} = names
+Base.values(atm::Atmosphere) = values(getfield(atm, :nt))
+Base.NamedTuple(atm::Atmosphere) = NamedTuple{keys(atm)}(values(atm))
+Base.Tuple(atm::Atmosphere) = values(atm)
+
+function Base.show(io::IO, t::Atmosphere)
+    length(getfield(t, :nt)) == 0 && return
+    print(io, "Atmosphere", NamedTuple(t))
+end
+
+Base.getproperty(mnt::Atmosphere, s::Symbol) = getproperty(getfield(mnt, :nt), s)
