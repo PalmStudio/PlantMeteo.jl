@@ -2,6 +2,7 @@ module PlantMeteo
 
 import Dates
 import DataFrames
+import Tables
 
 include("constants.jl")
 include("variables_computations.jl")
