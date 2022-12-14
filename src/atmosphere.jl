@@ -126,10 +126,30 @@ Base.keys(::Atmosphere{names}) where {names} = names
 Base.values(atm::Atmosphere) = values(getfield(atm, :nt))
 Base.NamedTuple(atm::Atmosphere) = NamedTuple{keys(atm)}(values(atm))
 Base.Tuple(atm::Atmosphere) = values(atm)
+Base.length(atm::Atmosphere) = length(getfield(atm, :nt))
 
 function Base.show(io::IO, t::Atmosphere)
-    length(getfield(t, :nt)) == 0 && return
+    length(t) == 0 && return
     print(io, "Atmosphere", NamedTuple(t))
 end
 
 Base.getproperty(mnt::Atmosphere, s::Symbol) = getproperty(getfield(mnt, :nt), s)
+
+# This is for the Tables.jl interface:
+Base.getindex(mnt::Atmosphere, i::Int) = getfield(getfield(mnt, :nt), i)
+Base.getindex(mnt::Atmosphere, i::Symbol) = getfield(getfield(mnt, :nt), i)
+function Base.indexed_iterate(mnt::Atmosphere, i::Int, state=1)
+    Base.indexed_iterate(getfield(mnt, :nt), i, state)
+end
+
+
+function show_long_format_row(t::Atmosphere, limit=false)
+    length(t) == 0 && return
+    nt = NamedTuple(t)
+    if limit && length(nt) > 10
+        nt = NamedTuple{keys(nt)[1:10]}(values(nt)[1:10])
+        join([string(k, "=", v) for (k, v) in pairs(nt)], ", ") * " ..."
+    else
+        join([string(k, "=", v) for (k, v) in pairs(nt)], ", ")
+    end
+end
