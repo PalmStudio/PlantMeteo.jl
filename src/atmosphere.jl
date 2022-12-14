@@ -143,7 +143,7 @@ function Base.indexed_iterate(mnt::Atmosphere, i::Int, state=1)
 end
 
 
-function show_long_format_row(t::Atmosphere, limit=false)
+function show_long_format_row(t, limit=false)
     length(t) == 0 && return
     nt = NamedTuple(t)
     if limit && length(nt) > 10
