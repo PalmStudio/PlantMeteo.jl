@@ -1,6 +1,5 @@
 """
-    Weather(D <: AbstractArray{<:AbstractAtmosphere}[, metadata])
-    Weather(df::DataFrame[, metadata])
+    Weather(data[, metadata])
 
 Defines the weather, *i.e.* the local conditions of the Atmosphere for one or more time-steps.
 Each time-step is described using the [`Atmosphere`](@ref) structure, and the resulting structure
@@ -49,10 +48,9 @@ df[!,:duration] .= 1800 # Add the time-step duration, 30min
 Weather(df, (site = "Aquiares", file = file))
 ```
 """
-function Weather(data::T, metadata::S=NamedTuple()) where {T<:AbstractArray{<:AbstractAtmosphere},S<:NamedTuple}
+function Weather(data, metadata::S=NamedTuple()) where {S<:NamedTuple}
     TimeStepTable(data, metadata)
 end
 
-function Weather(df::DataFrames.DataFrame, mt::S=NamedTuple()) where {S<:NamedTuple}
-    Weather([Atmosphere(; i...) for i in eachrow(df)], mt)
-end
+@deprecate Weather(data, metadata) TimeStepTable(data, metadata)
+@deprecate Weather(data) TimeStepTable(data)

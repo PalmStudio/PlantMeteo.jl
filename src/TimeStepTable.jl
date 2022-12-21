@@ -13,35 +13,26 @@ for an example implementation, or the `Status` type from
 # Examples
 
 ```julia
-# A leaf with several values for at least one of its variable will automatically use 
-# TimeStepTable{Status} with the time steps:
-leaf = ModelList(
-    photosynthesis = Fvcb(),
-    stomatal_conductance = Medlyn(0.03, 12.0),
-    status=(Tₗ=[25.0, 26.0], PPFD=1000.0, Cₛ=400.0, Dₗ=1.0)
-)
-
-# The status of the leaf is a TimeStepTable:
-status(leaf)
-
-
-# Of course we can also create a TimeStepTable manually:
-TimeStepTable(
+data = TimeStepTable(
     [
-        Status(Tₗ=25.0, PPFD=1000.0, Cₛ=400.0, Dₗ=1.0),
-        Status(Tₗ=26.0, PPFD=1200.0, Cₛ=400.0, Dₗ=1.2),
+        Atmosphere(T = 20.0, Wind = 1.0, P = 101.3, Rh = 0.65),
+        Atmosphere(T = 23.0, Wind = 1.5, P = 101.3, Rh = 0.60),
+        Atmosphere(T = 25.0, Wind = 3.0, P = 101.3, Rh = 0.55)
     ]
 )
 
-# We can also create a TimeStepTable from a DataFrame:
+# We can convert it into a DataFrame:
 using DataFrames
-df = DataFrame(
-    Tₗ=[25.0, 26.0],
-    PPFD=[1000.0, 1200.0],
-    Cₛ=[400.0, 400.0],
-    Dₗ=[1.0, 1.2],
-)
-TimeStepTable{Status}(df)
+df = DataFrame(data)
+
+# We can also create a TimeStepTable from a DataFrame:
+TimeStepTable(df)
+
+# Note that by default it will use NamedTuple to store the variables
+# for high performance. If you want to use a different type, you can
+# specify it as a type parameter (if you want *e.g.* mutability or pre-computations):
+TimeStepTable{Atmosphere}(df)
+# Or if you use PlantSimEngine: TimeStepTable{Status}(df)
 ```
 """
 struct TimeStepTable{T}
@@ -52,8 +43,15 @@ end
 
 TimeStepTable(ts::V, metadata=NamedTuple()) where {V<:Vector} = TimeStepTable(keys(ts[1]), metadata, ts)
 # Case where we instantiate the table with one time step only, not given as a vector:
-TimeStepTable(ts, metadata=NamedTuple()) = TimeStepTable(keys(ts), metadata, [ts])
+# TimeStepTable(ts, metadata=NamedTuple()) = TimeStepTable(keys(ts), metadata, [ts])
 
+function TimeStepTable{T}(ts, metadata=NamedTuple()) where {T}
+    TimeStepTable([T(; i...) for i in Tables.rows(ts)], metadata)
+end
+
+function TimeStepTable(ts, metadata=NamedTuple())
+    TimeStepTable([(; i...) for i in Tables.rows(ts)], metadata)
+end
 
 
 struct TimeStepRow{T} <: Tables.AbstractRow
@@ -74,6 +72,8 @@ metadata(ts::TimeStepTable) = getfield(ts, :metadata)
 function Tables.schema(m::TimeStepTable)
     Tables.Schema(names(m), DataType[i.types[1] for i in T.parameters[2]])
 end
+
+Tables.materializer(::Type{TimeStepTable}) = TimeStepTable
 
 Tables.rowaccess(::Type{<:TimeStepTable}) = true
 
@@ -177,35 +177,12 @@ function Base.append!(ts::TimeStepTable, x)
     append!(getfield(ts, :ts), x)
 end
 
-# function Base.show(io::IO, t::TimeStepTable, limit=true)
-#     length(t) == 0 && return
-
-#     ts_all = getfield(t, :ts)
-#     ts_print = []
-#     for (i, ts) in enumerate(ts_all)
-#         push!(ts_print, Term.highlight("Step $i: " * show_long_format_row(ts, true)))
-#         limit && i >= displaysize(io)[1] && (push!(ts_print, "…"); break)
-#     end
-
-#     st_panel = Term.Panel(
-#         join(ts_print, "\n"),
-#         title="TimeStepTable",
-#         style="red",
-#         fit=false,
-#     )
-
-#     print(io, st_panel)
-# end
-
-function Base.show(io::IO, t::TimeStepTable)
+function Base.show(io::IO, t::TimeStepTable{T}) where {T}
     length(t) == 0 && return
 
     print(
         io,
-        Term.RenderableText(
-            "TimeStepTable ($(length(t)) x $(length(getfield(t,:names)))):";
-            style="red bold"
-        )
+        "TimeStepTable{$(T.name.name)}($(length(t)) x $(length(getfield(t,:names)))):\n"
     )
 
     #! Note: There should be a better way to add the TimeStep as the first column. 
