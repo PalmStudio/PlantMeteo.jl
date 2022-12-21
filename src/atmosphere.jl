@@ -62,7 +62,7 @@ function Atmosphere(;
     Δ=e_sat_slope(T), clearness=9999.9, Ri_SW_f=9999.9, Ri_PAR_f=9999.9,
     Ri_NIR_f=9999.9, Ri_TIR_f=9999.9, Ri_custom_f=9999.9,
     args...
-) where {D1<:Dates.AbstractDateTime,D2<:Dates.Period}
+) where {D1<:Dates.AbstractTime,D2<:Dates.Period}
 
     # Checking some values:
     if Wind <= 0
@@ -82,6 +82,10 @@ function Atmosphere(;
         else
             @error "Rh should be 0 < Rh < 1, and its value is $(Rh)"
         end
+    end
+
+    if P <= 87.0 || P >= 110.0 # ~ max and min pressure on Earth
+        @warn "P ($P) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it"
     end
 
     if clearness != 9999.9 && (clearness <= 0 || clearness > 1)
