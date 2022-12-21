@@ -8,12 +8,8 @@ is a `TimeStepTable`.
 The simplest way to instantiate a `Weather` is to use a `DataFrame` as input.
 
 The `DataFrame` should be formated such as each row is an observation for a given time-step
-and each column is a variable. The column names should match exactly the field names of the
-[`Atmosphere`](@ref) structure, `i.e.`:
-
-```@example
-fieldnames(Atmosphere)
-```
+and each column is a variable. The column names should match exactly the variables names of the
+[`Atmosphere`](@ref) structure:
 
 ## See also
 
@@ -22,8 +18,9 @@ fieldnames(Atmosphere)
 
 ## Examples
 
+Example of weather data defined by hand (cumbersome):
+
 ```julia
-# Example of weather data defined by hand (cumbersome):
 w = Weather(
     [
         Atmosphere(T = 20.0, Wind = 1.0, P = 101.3, Rh = 0.65),
@@ -35,22 +32,29 @@ w = Weather(
         important_metadata = "this is important and will be attached to our weather data"
     )
 )
-
-# Example using a DataFrame, that you would usually import from a file:
-using CSV, DataFrames
-file = joinpath(dirname(dirname(pathof(PlantBiophysics))),"test","inputs","meteo.csv")
-df = CSV.read(file, DataFrame; header=5, datarow = 6)
-# Select and rename the variables:
-select!(df, :date, :VPD, :temperature => :T, :relativeHumidity => :Rh, :wind => :Wind, :atmosphereCO2_ppm => :Cₐ)
-df[!,:duration] .= 1800 # Add the time-step duration, 30min
-
-# Make the weather, and add some metadata:
-Weather(df, (site = "Aquiares", file = file))
 ```
+
+`Weather` is a `TimeStepTable{Atmosphere}`, so we can convert it into a `DataFrame`:
+
+```julia
+using DataFrames
+df = DataFrame(w)
+```
+
+And then back into `Weather` to make a `TimeStepTable{Atmosphere}`:
+
+```julia
+Weather(df, (site = "My site",))
+```
+
+Of course it works with any `DataFrame` that has at least the required
+variables listed in `Atmosphere`.
 """
 function Weather(data, metadata::S=NamedTuple()) where {S<:NamedTuple}
-    TimeStepTable(data, metadata)
+    TimeStepTable{Atmosphere}(data, metadata)
 end
 
-@deprecate Weather(data, metadata) TimeStepTable(data, metadata)
-@deprecate Weather(data) TimeStepTable(data)
+# This method directly calls TimeStepTable(ts::V, metadata=NamedTuple()) where {V<:Vector}:
+function Weather(data::V, metadata::S=NamedTuple()) where {V<:Vector{A} where {A<:Atmosphere},S<:NamedTuple}
+    TimeStepTable(data, metadata)
+end
