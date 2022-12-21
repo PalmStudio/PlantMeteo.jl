@@ -10,8 +10,8 @@ Atmosphere structure to hold all values related to the meteorology / atmosphere.
 
 # Arguments
 
-- `date = Dates.now()`: the date of the record.
-- `duration = 1.0` (seconds): the duration of the time-step.
+- `date<:AbstractDateTime = Dates.now()`: the date of the record.
+- `duration<:Period = Dates.Second(1.0)`: the duration of the time-step in Dates.Period.
 - `T` (°C): air temperature
 - `Wind` (m s-1): wind speed
 - `P = 101.325` (kPa): air pressure. The default value is at 1 atm, *i.e.* the mean sea-level
@@ -54,7 +54,7 @@ end
 # end
 
 function Atmosphere(;
-    T, Wind, Rh, date=Dates.now(), duration=1.0, P=101.325,
+    T, Wind, Rh, date::D1=Dates.now(), duration::D2=Dates.Second(1.0), P=101.325,
     Precipitations=0.0,
     Cₐ=400.0, e=vapor_pressure(T, Rh), eₛ=e_sat(T), VPD=eₛ - e,
     ρ=air_density(T, P), λ=latent_heat_vaporization(T),
@@ -62,7 +62,7 @@ function Atmosphere(;
     Δ=e_sat_slope(T), clearness=9999.9, Ri_SW_f=9999.9, Ri_PAR_f=9999.9,
     Ri_NIR_f=9999.9, Ri_TIR_f=9999.9, Ri_custom_f=9999.9,
     args...
-)
+) where {D1<:Dates.AbstractDateTime,D2<:Dates.Period}
 
     # Checking some values:
     if Wind <= 0
