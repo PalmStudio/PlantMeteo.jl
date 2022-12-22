@@ -200,20 +200,27 @@ Parse an hour that can be of several formats:
 
 # Examples
 
+```jldoctest 1
+julia> using PlantMeteo, Dates;
+```
+
 As a string:
-```jldoctest
+
+```jldoctest 1
 julia> PlantMeteo.parse_hour("12:00:00")
 12:00:00
 ```
 
 As a `Time`:
-```jldoctest
+
+```jldoctest 1
 julia> PlantMeteo.parse_hour(Dates.Time(12, 0, 0))
 12:00:00
 ```
 
 As a `DateTime`:
-```jldoctest
+
+```jldoctest 1
 julia> PlantMeteo.parse_hour(Dates.DateTime(2020, 1, 1, 12, 0, 0))
 12:00:00
 ```
