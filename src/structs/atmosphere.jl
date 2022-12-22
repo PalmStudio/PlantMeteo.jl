@@ -49,10 +49,6 @@ struct Atmosphere{N,T<:Tuple} <: AbstractAtmosphere
     nt::NamedTuple{N,T}
 end
 
-# function Atmosphere(nt::NamedTuple{names}) where {names}
-#     Atmosphere{names}(nt)
-# end
-
 function Atmosphere(;
     T, Wind, Rh, date::D1=Dates.now(), duration=Dates.Second(1.0), P=DEFAULTS.P,
     Precipitations=DEFAULTS.Precipitations,

@@ -6,19 +6,19 @@ import Tables
 import Term # for pretty printing the TimeStepTable
 import HTTP, JSON # for the open-meteo API
 
-include("defaults.jl")
-include("constants.jl")
-include("variables_computations.jl")
-include("emissivity.jl")
-include("atmosphere.jl")
-include("TimeStepTable.jl")
-include("duration.jl")
-include("weather.jl")
+include("structs/defaults.jl")
+include("structs/constants.jl")
+include("computations/variables_computations.jl")
+include("computations/emissivity.jl")
+include("structs/atmosphere.jl")
+include("structs/TimeStepTable.jl")
+include("computations/duration.jl")
+include("structs/weather.jl")
 include("APIs/transform_table.jl")
 include("APIs/generic_API.jl")
 include("APIs/read_weather.jl")
 include("APIs/open-meteo.jl")
-include("conversions.jl")
+include("computations/conversions.jl")
 
 export Atmosphere, TimeStepTable, Constants, Weather
 export atmosphere_emissivity, vapor_pressure
