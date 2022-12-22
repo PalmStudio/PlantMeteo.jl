@@ -27,7 +27,7 @@ from the other variables. Please check that all variables have the same units as
 ```julia
 using Dates
 
-file = joinpath(dirname(dirname(pathof(PlantBiophysics))),"test","inputs","meteo.csv")
+file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
 
 meteo = read_weather(
     file,
@@ -151,33 +151,91 @@ Compute the `duration` column depending on several cases:
 or `date`, compute the duration from the period between `hour_start` (or `date`) and `hour_end`.
 """
 function compute_duration!(df, hour_format)
-    # `duration` is not in the df but there is an `hour_end` column:
+    # Ensuring that the `hour_end` column is of Time type:
+    if hasproperty(df, :hour_end)
+        df.hour_end = parse_hour.(df.hour_end, hour_format)
+    end
+
+    # Ensuring that the `hour_start` column is of Time type:
+    if hasproperty(df, :hour_start)
+        df.hour_start = parse_hour.(df.hour_start, hour_format)
+    end
+
     if hasproperty(df, :hour_end) && !hasproperty(df, :duration)
-        if typeof(df.hour_end[1]) != Dates.Time
-            # There's a `hour_end` column but it is not of Time type
-            # If it is a String, it did not parse at reading with CSV, so trying to use
-            # the user-defined format:
-            if typeof(df.hour_end[1]) != String
-                try
-                    df.hour_end = Dates.Time.(df.hour_end, hour_format)
-                catch
-                    error(
-                        "The values in the `hour_end` column cannot be parsed.",
-                        " Please check the format of the hours or provide the format as argument."
-                    )
-                end
-            end
-
-            # If it is of Time type, transform it into a DateTime:
-            if typeof(df.hour_end[1]) == Dates.DateTime
-                df.hour_end = Dates.Time(df.hour_end)
-            end
-        end
-
         if hasproperty(df, :hour_start)
-            df.duration = Dates.Minute.(df.hour_end .- df.hour_start)
+            df.duration = Dates.canonicalize.(df.hour_end .- df.hour_start)
         elseif hasproperty(df, :date)
-            df.duration = Dates.Minute.(df.hour_end .- Dates.Time.(df.date))
+            df.duration = Dates.canonicalize.(df.hour_end .- Dates.Time.(df.date))
+        end
+    else
+        # No `hour_end` in the df, we compute the duration as the difference between two consecutive
+        # time steps:
+        if hasproperty(df, :DateTime)
+            df.duration = timesteps_durations(df.DateTime)
+        elseif hasproperty(df, :date) && df.date[1] == Dates.DateTime
+            df.duration = timesteps_durations(df.date)
+        elseif hasproperty(df, :date) && df.date[1] == Dates.Date && hasproperty(df, :hour_start)
+            df.DateTime = df.date .+ df.hour_start
+            df.duration = timesteps_durations(df.DateTime)
+        else
+            error(
+                "The `duration` column cannot be computed because of a lack of information.",
+                " Please provide `date` as a DateTime or `hour_end` or `hour_start` columns."
+            )
         end
     end
+end
+
+"""
+    parse_hour(h, hour_format=Dates.DateFormat("HH:MM:SS"))
+
+Parse an hour that can be of several formats:
+- `Time`: return it as is
+- `String`: try to parse it using the user-input `DateFormat`
+- `DateTime`: transform it into a `Time`
+
+# Arguments
+- `h`: hour to parse
+- `hour_format::DateFormat`: user-input format to parse the hours
+
+# Examples
+
+As a string:
+```jldoctest
+julia> PlantMeteo.parse_hour("12:00:00")
+12:00:00
+```
+
+As a `Time`:
+```jldoctest
+julia> PlantMeteo.parse_hour(Dates.Time(12, 0, 0))
+12:00:00
+```
+
+As a `DateTime`:
+```jldoctest
+julia> PlantMeteo.parse_hour(Dates.DateTime(2020, 1, 1, 12, 0, 0))
+12:00:00
+```
+"""
+function parse_hour(h, hour_format=Dates.DateFormat("HH:MM:SS"))
+    typeof(h) == Dates.Time && return h
+
+    if typeof(h) == String
+        try
+            h = Dates.Time(h, hour_format)
+        catch
+            error(
+                "Hour $h cannot be parsed into a Dates.Time with format $hour_format.",
+                " Please check the format of the hours or provide the format as argument."
+            )
+        end
+    end
+
+    # If it is of DateTime type, transform it into a Time:
+    if typeof(h) == Dates.DateTime
+        h = Dates.Time(h)
+    end
+
+    return h
 end
