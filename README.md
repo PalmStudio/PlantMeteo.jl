@@ -6,7 +6,3 @@
 [![Coverage](https://codecov.io/gh/PalmStudio/PlantMeteo.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/VEZY/PlantMeteo.jl)
 
 WIP package to compute and get meteorological or climatic data related to plant growth.
-
-# Road map
-
-- [ ] Replace dependency to DataFrame by Tables.jl
