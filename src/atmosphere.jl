@@ -54,15 +54,15 @@ end
 # end
 
 function Atmosphere(;
-    T, Wind, Rh, date::D1=Dates.now(), duration::D2=Dates.Second(1.0), P=101.325,
-    Precipitations=0.0,
-    Cₐ=400.0, e=vapor_pressure(T, Rh), eₛ=e_sat(T), VPD=eₛ - e,
+    T, Wind, Rh, date::D1=Dates.now(), duration=Dates.Second(1.0), P=DEFAULTS.P,
+    Precipitations=DEFAULTS.Precipitations,
+    Cₐ=DEFAULTS.Cₐ, e=vapor_pressure(T, Rh), eₛ=e_sat(T), VPD=eₛ - e,
     ρ=air_density(T, P), λ=latent_heat_vaporization(T),
     γ=psychrometer_constant(P, λ), ε=atmosphere_emissivity(T, e),
     Δ=e_sat_slope(T), clearness=9999.9, Ri_SW_f=9999.9, Ri_PAR_f=9999.9,
     Ri_NIR_f=9999.9, Ri_TIR_f=9999.9, Ri_custom_f=9999.9,
     args...
-) where {D1<:Dates.AbstractTime,D2<:Dates.Period}
+) where {D1<:Dates.AbstractTime}
 
     # Checking some values:
     if Wind <= 0
