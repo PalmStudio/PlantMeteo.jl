@@ -158,6 +158,12 @@ end
     return @inbounds rows[i]
 end
 
+Base.lastindex(ts::TimeStepTable) = length(ts)
+Base.lastindex(ts::TimeStepTable, dim::Integer) = size(ts, dim)
+Base.firstindex(ts::TimeStepTable) = 1
+Base.firstindex(ts::TimeStepTable, dim::Integer) = 1
+Base.axes(ts::TimeStepTable) = (firstindex(ts):lastindex(ts), firstindex(ts, 2):lastindex(ts, 2))
+
 # Indexing a TimeStepTable with a colon (e.g. `ts[1,:]`) gives all values in column.
 @inline function Base.getindex(ts::TimeStepTable, row_ind::Integer, ::Colon)
     return getindex(ts, row_ind)
@@ -180,9 +186,14 @@ end
 function Base.show(io::IO, t::TimeStepTable{T}) where {T}
     length(t) == 0 && return
 
+    T_string = string(T)
+    if length(T_string) > 30
+        T_string = string(T_string[1:30], "...")
+    end
+
     print(
         io,
-        "TimeStepTable{$(T.name.name)}($(length(t)) x $(length(getfield(t,:names)))):\n"
+        "TimeStepTable{$(T_string)}($(length(t)) x $(length(getfield(t,:names)))):\n"
     )
 
     #! Note: There should be a better way to add the TimeStep as the first column. 
