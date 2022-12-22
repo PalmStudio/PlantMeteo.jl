@@ -2,6 +2,7 @@ using PlantMeteo
 using Test
 using Dates
 using Tables, DataFrames
+using Documenter # for doctests
 
 @testset "Test PlantMeteo" begin
     @testset "Atmosphere" begin
@@ -26,5 +27,12 @@ using Tables, DataFrames
 
     @testset "OpenMeteo" begin
         include("test-openmeteo.jl")
+    end
+
+    @testset "Doctests" begin
+        DocMeta.setdocmeta!(PlantMeteo, :DocTestSetup, :(using PlantMeteo, Dates); recursive=true)
+
+        # Testing the doctests, i.e. the examples in the docstrings marked with jldoctest:
+        doctest(PlantMeteo; manual=false)
     end
 end
