@@ -6,8 +6,13 @@
 
 Read a meteo file. The meteo file is a CSV, and optionnaly with metadata in a header formatted
 as a commented YAML. The column names **and units** should match exactly the fields of
-[`Atmosphere`](https://palmstudio.github.io/PlantMeteo.jl/stable/#PlantMeteo.Atmosphere), or the user should provide their transformation as arguments (`args`)
-to help mapping the two. The transformations are given as for `DataFrames`.
+[`Atmosphere`](https://palmstudio.github.io/PlantMeteo.jl/stable/#PlantMeteo.Atmosphere), or 
+the user should provide their transformation as arguments (`args`) with the form: 
+- `:var_name => (x -> x .+ 1) => :new_name`: the variable `:var_name` is transformed by the function 
+    `x -> x .+ 1` and renamed to `:new_name`
+- `:var_name => :new_name`: the variable `:var_name` is renamed to `:new_name`
+- `(x -> x.var_name .+ 1) => :new_name`: the function `x -> x .+ 1` is applied to each data row and the returned value is given to `:new_name`
+- `:var_name`: the variable `:var_name` is kept as is
 
 # Note
 
@@ -18,9 +23,10 @@ from the other variables. Please check that all variables have the same units as
 # Arguments
 
 - `file::String`: path to a meteo file
-- `var_names = Dict()`: A Dict to map the file variable names to the Atmosphere variable names
+- `args...`: A list of arguments to transform the table. See above to see the possible forms.
 - `date_format = DateFormat("yyyy-mm-ddTHH:MM:SS.s")`: the format for the `DateTime` columns
 - `hour_format = DateFormat("HH:MM:SS")`: the format for the `Time` columns (*e.g.* `hour_start`)
+- `operation = "transform"`: the operation to perform on the table. Can be `"transform"` or `"select"`.
 
 # Examples
 
@@ -42,14 +48,23 @@ meteo = read_weather(
 function read_weather(
     file, args...;
     date_format=Dates.DateFormat("yyyy-mm-ddTHH:MM:SS.s"),
-    hour_format=Dates.DateFormat("HH:MM:SS")
+    hour_format=Dates.DateFormat("HH:MM:SS"),
+    operation="transform"
 )
 
-    arguments = (args...,)
-    data, metadata_ = read_weather(file, DataFrames.DataFrame)
+    @assert operation in ("transform", "select") "operation must be either \"transform\" or \"select\""
 
-    # Clean-up the variable names:
-    length(arguments) > 0 && DataFrames.transform!(data, arguments...)
+    arguments = (args...,)
+    data, metadata_ = read_weather_(file)
+
+    # Apply the transformations eventually given by the user:
+    data = transform(
+        data,
+        (x -> compute_date(x, date_format, hour_format)) => :date,
+        (x -> compute_duration(x, hour_format)) => :duration,
+        arguments...;
+        operation="transform"
+    )
 
     # If there's a "use" field in the YAML, parse it and rename it:
     if haskey(metadata_, "use")
@@ -62,17 +77,10 @@ function read_weather(
     end
     # NB: the "use" field is not used in PlantMeteo, but it is still correctly parsed.
 
-    compute_date!(data, date_format, hour_format)
-    compute_duration!(data, hour_format)
-
-    # cols = fieldnames(PlantMeteo.Atmosphere)
-    # DataFrames.select!(data, DataFrames.names(data, x -> Symbol(x) in cols))
-    # NB: we don't select anymore so the user can have the extra columns if needed.
-
-    Weather(data, (; zip(Symbol.(keys(metadata_)), values(metadata_))...))
+    return Weather(data, (; zip(Symbol.(keys(metadata_)), values(metadata_))...))
 end
 
-function read_weather(file, ::Type{DataFrames.DataFrame})
+function read_weather_(file)
     yaml_data = open(file, "r") do io
         yaml_data = ""
         is_yaml = true
@@ -90,27 +98,38 @@ function read_weather(file, ::Type{DataFrames.DataFrame})
     metadata_ = length(yaml_data) > 0 ? YAML.load(yaml_data) : Dict()
     push!(metadata_, "file" => file)
 
-    met_data = CSV.read(file, DataFrames.DataFrame; comment="#")
+    met_data = CSV.File(file; comment="#")
 
     (data=met_data, metadata_=metadata_)
 end
 
 """
-    compute_date!(df, date_format, hour_format)
+    compute_date(data, date_format, hour_format)
 
 Compute the `date` column depending on several cases:
 
-- If it is already in the DataFrame and is a `DateTime`, does nothing.
+- If it is already in data and is a `DateTime`, does nothing.
 - If it is a `String`, tries and parse it using a user-input `DateFormat`
 - If it is a `Date`, return it as is, or try to make it a `DateTime` if there's a column named
 `hour_start`
+
+# Arguments
+
+- `data`: any `Tables.jl` compatible table, such as a `DataFrame`
+- `date_format`: a `DateFormat` to parse the `date` column if it is a `String`
+- `hour_format`: a `DateFormat` to parse the `hour_start` column if it is a `String`
 """
-function compute_date!(df, date_format, hour_format)
-    if hasproperty(df, :date) && typeof(df.date[1]) != Dates.DateTime
+function compute_date(
+    data,
+    date_format=Dates.DateFormat("yyyy-mm-ddTHH:MM:SS.s"),
+    hour_format=Dates.DateFormat("HH:MM:SS"),
+)
+
+    if hasproperty(data, :date) && typeof(data.date) != Dates.DateTime
         # There's a "date" column but it is not a DateTime
         # Trying to parse it with the user-defined format:
-        try
-            df.date = Dates.Date.(df.date, date_format)
+        date = try
+            Dates.Date(data.date, date_format)
         catch
             error(
                 "The values in the `date` column cannot be parsed.",
@@ -118,65 +137,67 @@ function compute_date!(df, date_format, hour_format)
             )
         end
 
-        if typeof(df.date[1]) == Dates.Date && hasproperty(df, :hour_start)
+        if typeof(date) == Dates.Date && hasproperty(data, :hour_start)
             # The `date` column is of Date type, we have to add the Time if there's a column named
             # `hour_start`:
-            if typeof(df.hour_start[1]) != Dates.Time
+            if typeof(data.hour_start) != Dates.Time
                 # There's a "hour_start" column but it is not of Time type
                 # If it is a String, it did not parse at reading with CSV, so trying to use
                 # the user-defined format:
-                try
-                    df.hour_start = Dates.Time.(df.hour_start, hour_format)
+                date = try
+                    # Adding the Time to the Date to make a DateTime:
+                    date + Dates.Time(data.hour_start, hour_format)
                 catch
                     error(
                         "The values in the `hour_start` column cannot be parsed.",
                         " Please check the format of the hours or provide the format as argument."
                     )
                 end
+            else
+                date = date + data.hour_start
             end
-            # Adding the Time to the Date to make a DateTime:
-            df.date = df.date .+ df.hour_start
         end
+    else
+        date = data.date
     end
+
+    return date
 end
 
 
 """
-    compute_duration!(df, hour_format)
+    compute_duration(data, hour_format)
 
 Compute the `duration` column depending on several cases:
 
-- If it is already in the DataFrame, does nothing.
+- If it is already in the data, does nothing.
 - If it is not, but there's a column named `hour_end` and another one either called `hour_start`
 or `date`, compute the duration from the period between `hour_start` (or `date`) and `hour_end`.
+
+# Arguments
+- `data`: any `Tables.jl` compatible table, such as a `DataFrame`
+- `hour_format`: a `DateFormat` to parse the `hour_start` and `hour_end` columns if they are `String`s.
 """
-function compute_duration!(df, hour_format)
-    # Ensuring that the `hour_end` column is of Time type:
-    if hasproperty(df, :hour_end)
-        df.hour_end = parse_hour.(df.hour_end, hour_format)
-    end
+function compute_duration(data, hour_format=Dates.DateFormat("HH:MM:SS"))
+    if hasproperty(data, :hour_end) && !hasproperty(data, :duration)
+        hour_end = parse_hour.(data.hour_end, hour_format)
 
-    # Ensuring that the `hour_start` column is of Time type:
-    if hasproperty(df, :hour_start)
-        df.hour_start = parse_hour.(df.hour_start, hour_format)
-    end
-
-    if hasproperty(df, :hour_end) && !hasproperty(df, :duration)
-        if hasproperty(df, :hour_start)
-            df.duration = Dates.canonicalize.(df.hour_end .- df.hour_start)
-        elseif hasproperty(df, :date)
-            df.duration = Dates.canonicalize.(df.hour_end .- Dates.Time.(df.date))
+        if hasproperty(data, :hour_start)
+            hour_start = parse_hour.(data.hour_start, hour_format)
+            duration = Dates.canonicalize.(hour_end .- hour_start)
+        elseif hasproperty(data, :date)
+            duration = Dates.canonicalize.(hour_end .- Dates.Time.(data.date))
         end
     else
-        # No `hour_end` in the df, we compute the duration as the difference between two consecutive
+        # No `hour_end` in the data, we compute the duration as the difference between two consecutive
         # time steps:
-        if hasproperty(df, :DateTime)
-            df.duration = timesteps_durations(df.DateTime)
-        elseif hasproperty(df, :date) && df.date[1] == Dates.DateTime
-            df.duration = timesteps_durations(df.date)
-        elseif hasproperty(df, :date) && df.date[1] == Dates.Date && hasproperty(df, :hour_start)
-            df.DateTime = df.date .+ df.hour_start
-            df.duration = timesteps_durations(df.DateTime)
+        if hasproperty(data, :DateTime)
+            duration = timesteps_durations(data.DateTime)
+        elseif hasproperty(data, :date) && data.date[1] == Dates.DateTime
+            duration = timesteps_durations(data.date)
+        elseif hasproperty(data, :date) && data.date[1] == Dates.Date && hasproperty(data, :hour_start)
+            hour_start = parse_hour.(data.hour_start, hour_format)
+            duration = timesteps_durations(data.date .+ hour_start)
         else
             error(
                 "The `duration` column cannot be computed because of a lack of information.",
@@ -184,6 +205,8 @@ function compute_duration!(df, hour_format)
             )
         end
     end
+
+    return duration
 end
 
 """

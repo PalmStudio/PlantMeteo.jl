@@ -1,7 +1,7 @@
 module PlantMeteo
 
 import Dates
-import DataFrames, YAML, CSV
+import YAML, CSV
 import Tables
 import Term # for pretty printing the TimeStepTable
 import HTTP, JSON # for the open-meteo API
@@ -14,6 +14,7 @@ include("atmosphere.jl")
 include("TimeStepTable.jl")
 include("duration.jl")
 include("weather.jl")
+include("APIs/transform_table.jl")
 include("APIs/generic_API.jl")
 include("APIs/read_weather.jl")
 include("APIs/open-meteo.jl")
