@@ -19,4 +19,12 @@ using Tables, DataFrames
     @testset "TimeStepTable" begin
         include("test-TimeStepTable.jl")
     end
+
+    @testset "Generic meteo API" begin
+        include("test-genericAPI.jl")
+    end
+
+    @testset "OpenMeteo" begin
+        include("test-openmeteo.jl")
+    end
 end
