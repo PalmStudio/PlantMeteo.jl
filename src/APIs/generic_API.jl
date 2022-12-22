@@ -28,13 +28,11 @@ use it responsibly.
 
 # Examples
 
-```jldoctest
+```julia
 using PlantMeteo, Dates
-julia> get_weather(48.8566, 2.3522, Date(2020, 1, 1):Day(1):Date(2020, 1, 3))
-3-element Array{Weather,1}:
- Weather(1.0, 0.0, 0.0)
- Weather(1.0, 0.0, 0.0)
- Weather(1.0, 0.0, 0.0)
+# Forecast for today and tomorrow:
+period = today():Day(1):today()+Dates.Day(1) 
+w = get_forecast(OpenMeteo(), 48.8566, 2.3522, period)
 ```
 """
 function get_weather(lat, lon, period::P; api::AbstractAPI=OpenMeteo(), sink=TimeStepTable) where {P<:Union{StepRange{Dates.Date,Dates.Day},Vector{Dates.Date}}}

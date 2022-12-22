@@ -1,7 +1,8 @@
 using PlantMeteo
 using Documenter
+using Dates
 
-DocMeta.setdocmeta!(PlantMeteo, :DocTestSetup, :(using PlantMeteo); recursive=true)
+DocMeta.setdocmeta!(PlantMeteo, :DocTestSetup, :(using PlantMeteo, Dates); recursive=true)
 
 makedocs(;
     modules=[PlantMeteo],
