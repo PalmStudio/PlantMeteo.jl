@@ -36,7 +36,7 @@ function PlantMeteo.get_forecast(params::TestAPI, lat, lon, period; verbose=true
     )
 end
 
-@testset "OpenMeteo forecast data" begin
+@testset "Generic API with TestAPI" begin
     period = Dates.today():Dates.Day(1):Dates.today()+Dates.Day(1)
     api = TestAPI()
     sink = TimeStepTable
@@ -46,4 +46,15 @@ end
     @test typeof(w) <: TimeStepTable{A} where {A<:Atmosphere}
     @test typeof(w.T) == Vector{Float64}
     @test keys(w) == vars
+end
+
+@testset "Generic APi sink" begin
+    period = Dates.today():Dates.Day(1):Dates.today()+Dates.Day(1)
+    api = TestAPI()
+    sink = DataFrame
+
+    w = get_weather(lat, lon, period; api=api, sink=sink)
+    @test typeof(w) <: DataFrame
+    @test nrow(w) == 2 # 2 x 24 hours
+    @test names(w) == [string.(vars)...]
 end
