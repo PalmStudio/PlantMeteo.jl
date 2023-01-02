@@ -27,12 +27,12 @@ atmospheric pressure on Earth.
 - `γ = psychrometer_constant(P, λ, constants.Cₚ, constants.ε)` (kPa K−1): psychrometer "constant"
 - `ε = atmosphere_emissivity(T,e,constants.K₀)` (0-1): atmosphere emissivity
 - `Δ = e_sat_slope(meteo.T)` (0-1): slope of the saturation vapor pressure at air temperature
-- `clearness::A = 9999.9` (0-1): Sky clearness
-- `Ri_SW_f::A = 9999.9` (W m-2): Incoming short wave radiation flux
-- `Ri_PAR_f::A = 9999.9` (W m-2): Incoming PAR flux
-- `Ri_NIR_f::A = 9999.9` (W m-2): Incoming NIR flux
-- `Ri_TIR_f::A = 9999.9` (W m-2): Incoming TIR flux
-- `Ri_custom_f::A = 9999.9` (W m-2): Incoming radiation flux for a custom waveband
+- `clearness::A = Inf` (0-1): Sky clearness
+- `Ri_SW_f::A = Inf` (W m-2): Incoming short wave radiation flux
+- `Ri_PAR_f::A = Inf` (W m-2): Incoming PAR flux
+- `Ri_NIR_f::A = Inf` (W m-2): Incoming NIR flux
+- `Ri_TIR_f::A = Inf` (W m-2): Incoming TIR flux
+- `Ri_custom_f::A = Inf` (W m-2): Incoming radiation flux for a custom waveband
 
 # Notes
 
@@ -55,8 +55,8 @@ function Atmosphere(;
     Cₐ=DEFAULTS.Cₐ, e=vapor_pressure(T, Rh), eₛ=e_sat(T), VPD=eₛ - e,
     ρ=air_density(T, P), λ=latent_heat_vaporization(T),
     γ=psychrometer_constant(P, λ), ε=atmosphere_emissivity(T, e),
-    Δ=e_sat_slope(T), clearness=9999.9, Ri_SW_f=9999.9, Ri_PAR_f=9999.9,
-    Ri_NIR_f=9999.9, Ri_TIR_f=9999.9, Ri_custom_f=9999.9,
+    Δ=e_sat_slope(T), clearness=Inf, Ri_SW_f=Inf, Ri_PAR_f=Inf,
+    Ri_NIR_f=Inf, Ri_TIR_f=Inf, Ri_custom_f=Inf,
     args...
 ) where {D1<:Dates.AbstractTime}
 
@@ -84,7 +84,7 @@ function Atmosphere(;
         @warn "P ($P) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it"
     end
 
-    if clearness != 9999.9 && (clearness <= 0 || clearness > 1)
+    if clearness != Inf && (clearness <= 0 || clearness > 1)
         @error "clearness should always be 0 < clearness < 1"
     end
 
