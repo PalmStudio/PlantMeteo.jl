@@ -16,14 +16,14 @@
         0.3, 0.0, 400.0, 0.9540587244435038, 3.180195748145013,
         2.2261370237015092, 1.1838896840018194, 2.441875e6,
         0.06757907523556121, 0.5455578187331258, 0.19009500927530176,
-        9999.9, 9999.9, 9999.9, 9999.9, 9999.9, 9999.9
+        Inf, Inf, Inf, Inf, Inf, Inf
     )
     )
 
     # Testing Rh with values given in %:
-    @test_logs (:warn, "Rh should be 0 < Rh < 1, assuming it is given in % and dividing by 100") Atmosphere(T=25, Wind=5, Rh=30)
+    @test_logs (:warn, "Rh (30) should be 0 < Rh < 1, assuming it is given in % and dividing by 100") Atmosphere(T=25, Wind=5, Rh=30)
     # Testing Rh with values given with wrong value:
-    @test_logs (:error, "Rh should be 0 < Rh < 1, and its value is 300") Atmosphere(T=25, Wind=5, Rh=300)
+    @test_logs (:error, "Rh (300) should be 0 < Rh < 1") Atmosphere(T=25, Wind=5, Rh=300)
 
     @test_logs (:warn, "P (10.0) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it") Atmosphere(T=25, Wind=5, Rh=0.3, P=10.0)
     @test_logs (:warn, "P (1003.0) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it") Atmosphere(T=25, Wind=5, Rh=0.3, P=1003.0)
