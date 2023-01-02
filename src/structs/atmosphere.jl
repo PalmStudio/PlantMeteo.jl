@@ -62,21 +62,21 @@ function Atmosphere(;
 
     # Checking some values:
     if Wind <= 0.0
-        @warn "Wind should always be > 0, forcing it to 1e-6"
+        @warn "Wind ($Wind) should always be > 0, forcing it to 1e-6"
         Wind = 1.0e-6
     end
 
     if Rh <= 0.0
-        @warn "Rh should always be > 0, forcing it to 1e-6"
+        @warn "Rh ($Rh) should always be > 0, forcing it to 1e-6"
         Rh = 1.0e-6
     end
 
     if Rh > 1.0
         if 1.0 < Rh < 100.0
-            @warn "Rh should be 0 < Rh < 1, assuming it is given in % and dividing by 100"
+            @warn "Rh ($Rh) should be 0 < Rh < 1, assuming it is given in % and dividing by 100"
             Rh /= 100.0
         else
-            @error "Rh should be 0 < Rh < 1, and its value is $(Rh)"
+            @error "Rh ($Rh) should be 0 < Rh < 1"
         end
     end
 
@@ -85,7 +85,7 @@ function Atmosphere(;
     end
 
     if clearness != Inf && (clearness <= 0.0 || clearness > 1.0)
-        @error "clearness should always be 0 < clearness < 1"
+        @error "clearness ($clearness) should always be 0 < clearness < 1"
     end
 
     params_same_type =
