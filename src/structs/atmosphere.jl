@@ -61,20 +61,20 @@ function Atmosphere(;
 ) where {D1<:Dates.AbstractTime}
 
     # Checking some values:
-    if Wind <= 0
+    if Wind <= 0.0
         @warn "Wind should always be > 0, forcing it to 1e-6"
-        Wind = 1e-6
+        Wind = 1.0e-6
     end
 
-    if Rh <= 0
+    if Rh <= 0.0
         @warn "Rh should always be > 0, forcing it to 1e-6"
-        Rh = 1e-6
+        Rh = 1.0e-6
     end
 
-    if Rh > 1
-        if 1 < Rh < 100
+    if Rh > 1.0
+        if 1.0 < Rh < 100.0
             @warn "Rh should be 0 < Rh < 1, assuming it is given in % and dividing by 100"
-            Rh /= 100
+            Rh /= 100.0
         else
             @error "Rh should be 0 < Rh < 1, and its value is $(Rh)"
         end
@@ -84,7 +84,7 @@ function Atmosphere(;
         @warn "P ($P) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it"
     end
 
-    if clearness != Inf && (clearness <= 0 || clearness > 1)
+    if clearness != Inf && (clearness <= 0.0 || clearness > 1.0)
         @error "clearness should always be 0 < clearness < 1"
     end
 
