@@ -1,18 +1,27 @@
+# This file is not used. It could be if we want to remove the dependency to `DataFrames.jl`,
+# but it is not a priority. If you plan to re-use it, you have to update: 
+# - src/APIs/read_weather.jl.
+# - src/computations/to_daily.jl
+# - test/test-transform.jl (just re-use it in the tests)
+
 """
-    transform(data, args...; operation="transform")
+    transform(data, args...)
 
 Transforms a `Tables.jl`-alike table using the arguments `args`.
-Returns a `Vector` of `NamedTuples`.
+Returns a `Vector` of `NamedTuples`. This function is close to `transform` from `DataFrames.jl` 
+but applies the transformations row by row instead of on the whole column.
 
 # Arguments
+
 - `data`: a `Tables.jl`-alike table
 - `args...`: a list of arguments to transform the table. There's 3 forms:
     1. `:var => :new_var` which renames the variable `var` to `new_var`
     2. `:var => (x -> x .+ 1) => :new_var` which computes a new variable `:new_var` by applying the function `(x -> x .+ 1)` to `:var`
     3. `:var` which keeps the variable `var` as is (no renaming or computation)
-- `operation="transform"`: the operation to perform. Can be `"transform"` or `"select"`. In `"transform"` mode, 
-    the function returns a new table with the same variables as the input table and the optionaly new variables. 
-    In `"select"` mode, the function returns a new table with only the variables required by the user.
+
+# See also 
+
+[`select`](@ref)
 
 # Examples
 
@@ -28,36 +37,78 @@ meteo = PlantMeteo.transform(
     :relativeHumidity => (x -> x ./100) => :Rh,
     :wind => :Wind,
     :atmosphereCO2_ppm => :Cₐ,
-    (x -> PlantMeteo.compute_date(x, date_format)) => :date,
-    (x -> PlantMeteo.compute_duration(x)) => :duration,
 )
 ```
 """
-function transform(data, args...; operation="transform")
-    @assert operation in ("transform", "select") "operation must be either \"transform\" or \"select\""
+function transform(data, args...)
+    return transform_or_select(data, args...; select=false)
+end
+
+"""
+    select(data, args...)
+
+Transforms and select (*i.e.* keep only the transformed variables) a `Tables.jl`-alike 
+table using the arguments `args`. Returns a `Vector` of `NamedTuples`. This function is close to 
+`select` from `DataFrames.jl` but applies the transformations row by row instead of on 
+the whole column.
+
+# Arguments
+
+- `data`: a `Tables.jl`-alike table
+- `args...`: a list of arguments to transform the table. There's 3 forms:
+    1. `:var => :new_var` which renames the variable `var` to `new_var`
+    2. `:var => (x -> x .+ 1) => :new_var` which computes a new variable `:new_var` by applying the function `(x -> x .+ 1)` to `:var`
+    3. `:var` which keeps the variable `var` as is (no renaming or computation)
+
+# See also 
+
+[`transform`](@ref)
+
+# Examples
+
+```julia
+using Dates, PlantMeteo
+file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
+data, metadata = PlantMeteo.read_weather_(file)
+date_format = Dates.DateFormat("yyyy/mm/dd")
+
+meteo = PlantMeteo.select(
+    data,
+    :temperature => :T,
+    :relativeHumidity => (x -> x ./100) => :Rh,
+    :wind => :Wind,
+    :atmosphereCO2_ppm => :Cₐ
+)
+```
+"""
+function select(data, args...)
+    return transform_or_select(data, args...; select=true)
+end
+
+function transform_or_select(data, args...; select::Bool=false)
     args = (args...,)
 
     if length(args) == 0
         return NamedTuple.(data)
     end
 
-    row_dict = preallocated_row(data, args; operation=operation)
+    row_dict = preallocated_row(data, args; select=select)
     rows = [transform_row(row, row_dict, args) for row in data]
 
     return rows
 end
 
 """
-    preallocated_row(data, args; operation="transform")
+    preallocated_row(data, args; select=false)
 
 Pre-allocates a `Dict` to be used in [`transform_row`](@ref) to avoid 
 allocating a new `Dict` for each row. The variables in the `Dict`
 depends on the `operation` argument and the `args` argument.
 """
-function preallocated_row(data, args; operation="transform")
+function preallocated_row(data, args; select=false)
     nt = NamedTuple(data[1])
     # pre-allocate the dict with the new variables
-    if operation == "select"
+    if select
         # in "select" mode, we want to keep only the variables required by the user
         row = Dict{Symbol,Any}()
     else
@@ -75,7 +126,7 @@ function preallocated_row(data, args; operation="transform")
         elseif isa(a.second, Pair)
             push!(row, a.second.second => a.second.first(nt[a.first]))
             # remove the old variable if we are not in "select" mode:
-            operation == "select" && pop!(row, a.first)
+            select && pop!(row, a.first)
         else
             push!(row, a.second => nt[a.first])
             pop!(row, a.first) # remove the old variable as it was renamed
@@ -87,7 +138,7 @@ end
 
 
 """
-    transform_row(row, dict_row, args)
+    transform_row(row, dict_row, args, select=false)
 
 Transforms a row of a `Tables.jl`-alike table using the arguments `args`.
 The function efficiently transforms a pre-allocated `dict_row` in-place.
@@ -109,10 +160,10 @@ form is `:var` which selects the variable `:var` and keeps the same name.
 transforms `dict_row` in-place, so it should 
 be pre-allocated with the output variables already.
 """
-function transform_row(row, dict_row, args, operation="transform")
+function transform_row(row, dict_row, args, select=false)
     nt_row = NamedTuple(row)
 
-    if operation == "transform"
+    if !select
         # If we are in "transform" mode, we want to keep all the variables, so we copy their values into the dict first:
         for (k, v) in pairs(nt_row)
             dict_row[k] = v
@@ -129,11 +180,9 @@ function transform_row(row, dict_row, args, operation="transform")
         # Else, it must be a Pair
         !isa(a, Pair) && error("The arguments should be a tuple of Pairs or Symbols. Got $a instead.")
 
-        !isa(a, Pair) && error("Invalid argument: $a, please check its definition.")
-
         if isa(a.first, Base.Callable)
             # Here we have the form (x -> x.var .+ 1) => :new_var
-            push!(dict_row, a.second => a.first(nt_row))
+            dict_row[a.second] = a.first(nt_row)
         elseif isa(a.second, Pair)
             # Here we have the form :var => (x -> x .+ 1) => :new_var, we transform "var" with the function 
             # and put the result in "new_var"

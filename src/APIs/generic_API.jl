@@ -8,13 +8,14 @@ abstract type AbstractAPI end
 
 
 """
-    get_weather(lat, lon, period::Dates.Date; api::DataType=OpenMeteo, sink=TimeStepTable)
+    get_weather(lat, lon, period::Union{StepRange{Date, Day}, Vector{Dates.Date}}; api::DataType=OpenMeteo, sink=TimeStepTable)
 
 Returns the weather forecast for a given location and time using a weather API.
 
 # Arguments
-- `lat::Float64`: Latitude of the location
-- `lon::Float64`: Longitude of the location
+
+- `lat::Float64`: Latitude of the location in degrees
+- `lon::Float64`: Longitude of the location in degrees
 - `period::Union{StepRange{Date, Day}, Vector{Dates.Date}}`: Period of the forecast
 - `api::DataType=OpenMeteo`: API to use for the forecast.
 - `sink::DataType=TimeStepTable`: Type of the output. Default is `TimeStepTable`, but it
@@ -31,29 +32,17 @@ use it responsibly.
 ```julia
 using PlantMeteo, Dates
 # Forecast for today and tomorrow:
-period = today():Day(1):today()+Dates.Day(1) 
-w = get_forecast(OpenMeteo(), 48.8566, 2.3522, period)
+period = [today(), today()+Dates.Day(1)]
+w = get_weather(48.8566, 2.3522, period)
 ```
 """
 function get_weather(lat, lon, period::P; api::AbstractAPI=OpenMeteo(), sink=TimeStepTable) where {P<:Union{StepRange{Dates.Date,Dates.Day},Vector{Dates.Date}}}
-    # Get the weather forecast from open-meteo.com
+
+    @assert lat >= -90 && lat <= 90 "Latitude must be between -90 and 90"
+    @assert lon >= -180 && lon <= 180 "Longitude must be between -180 and 180"
+
+    # Get the weather forecast from the API:
     tst = get_forecast(api, lat, lon, period)
-
-    # Get the forecasted weather variables
-    # t_min = forecast["t_min"]
-    # t_max = forecast["t_max"]
-    # rh_min = forecast["rh_min"]
-    # rh_max = forecast["rh_max"]
-    # wind = forecast["wind"]
-
-    # # Compute the average temperature
-    # t_mean = (t_min + t_max) / 2
-
-    # # Compute the average relative humidity
-    # rh_mean = (rh_min + rh_max) / 2
-
-    # # Compute the vapor pressure deficit
-    # vpd = vapor_pressure_deficit(t_mean, rh_mean)
 
     # Use the sink:
     if sink == TimeStepTable

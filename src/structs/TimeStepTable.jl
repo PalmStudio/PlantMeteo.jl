@@ -158,6 +158,26 @@ end
     return @inbounds rows[i]
 end
 
+"""
+    get_index_raw(ts::TimeStepTable, i::Integer)
+
+Get row from `TimeStepTable` in its raw format, *e.g.* as a `NamedTuple`
+or `Atmosphere` of values.
+"""
+function get_index_raw(ts::TimeStepTable, i::Integer)
+    raw_row(ts[i])
+end
+
+"""
+    raw_row(ts::TimeStepRow)
+
+Get `TimeStepRow` in its raw format, *e.g.* as a `NamedTuple`
+or `Atmosphere` of values.
+"""
+function raw_row(row::TimeStepRow)
+    getfield(getfield(row, :source), :ts)[getfield(row, :row)]
+end
+
 Base.lastindex(ts::TimeStepTable) = length(ts)
 Base.lastindex(ts::TimeStepTable, dim::Integer) = size(ts, dim)
 Base.firstindex(ts::TimeStepTable) = 1

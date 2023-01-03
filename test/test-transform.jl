@@ -1,3 +1,5 @@
+# This test file is not used anymore. See src/computations/transform_and_select.jl.
+
 file = joinpath(dirname(dirname(pathof(PlantMeteo))), "test", "data", "meteo.csv")
 
 @testset "transform()" begin
