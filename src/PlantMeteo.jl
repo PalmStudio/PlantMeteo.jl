@@ -32,7 +32,7 @@ export rh_from_vpd, rh_from_e, vpd
 export metadata
 export read_weather
 export get_forecast
-export OpenMeteo
+export OpenMeteo, OpenMeteoUnits
 export get_weather
 export to_daily
 
