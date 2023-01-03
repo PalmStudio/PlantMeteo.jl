@@ -6,6 +6,7 @@ Transform a `DataFrame` object or `TimeStepTable{<:Atmosphere}` with
 sub-daily time steps (*e.g.* 1h) to a daily time-step table.
 
 # Arguments
+
 - `t`: a `TimeStepTable{<:Atmosphere}` with sub-daily time steps (*e.g.* 1h)
 - `args`: a list of transformations to apply to the data, formates as for `DataFrames.jl`
 
@@ -34,7 +35,7 @@ default transformations are only applied if the variable is available.
 ```julia
 using PlantMeteo, Dates
 # Forecast for today and tomorrow:
-period = today():Day(1):today()+Dates.Day(1)
+period = [today(), today()+Dates.Day(1)]
 w = get_weather(48.8566, 2.3522, period)
 # Convert to daily:
 w_daily = to_daily(w, :T => mean => :Tmean)
