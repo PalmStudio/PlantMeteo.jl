@@ -119,6 +119,10 @@ function Base.getproperty(ts::TimeStepTable, key::Symbol)
     getproperty(Tables.columns(ts), key)
 end
 
+function Base.propertynames(ts::TimeStepTable)
+    keys(Tables.columns(ts))
+end
+
 # Indexing with a Symbol extracts the variable (same as getproperty):
 function Base.getindex(ts::TimeStepTable, index::Symbol)
     getproperty(ts, index)
