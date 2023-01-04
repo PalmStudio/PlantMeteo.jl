@@ -29,7 +29,7 @@ from the other variables. Please check that all variables have the same units as
 # Examples
 
 ```julia
-using Dates
+using PlantMeteo, Dates
 
 file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
 
