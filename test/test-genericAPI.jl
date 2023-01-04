@@ -61,7 +61,7 @@ end
 
 
 @testset "to_daily" begin
-    period = Dates.today():Dates.Day(1):Dates.today()+Dates.Day(2)
+    period = [Dates.today(), Dates.today() + Dates.Day(2)]
     api = TestAPI()
     w = get_weather(lat, lon, period; api=api, sink=TimeStepTable)
     w_daily = to_daily(w)

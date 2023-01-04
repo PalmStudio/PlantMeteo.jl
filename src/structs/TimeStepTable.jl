@@ -42,8 +42,12 @@ struct TimeStepTable{T}
 end
 
 TimeStepTable(ts::V, metadata=NamedTuple()) where {V<:Vector} = TimeStepTable(keys(ts[1]), metadata, ts)
-# Case where we instantiate the table with one time step only, not given as a vector:
-# TimeStepTable(ts, metadata=NamedTuple()) = TimeStepTable(keys(ts), metadata, [ts])
+
+# If the metadata is a Dict, we convert it to a NamedTuple
+function TimeStepTable(ts::V, metadata::D) where {V<:Vector,D<:Dict}
+    md = NamedTuple(zip(Symbol.(keys(metadata)), values(metadata)))
+    TimeStepTable(ts, md)
+end
 
 function TimeStepTable{T}(ts, metadata=NamedTuple()) where {T}
     TimeStepTable([T(; i...) for i in Tables.rows(ts)], metadata)

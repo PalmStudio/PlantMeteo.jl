@@ -15,5 +15,11 @@ var_names = Dict(:temperature => :T, :relativeHumidity => :Rh, :wind => :Wind, :
     )
 
     @test typeof(meteo) <: TimeStepTable
-    @test NamedTuple(PlantMeteo.metadata(meteo)) == (; name="Aquiares", latitude=15.0, altitude=100.0, use=[:clearness], file=file)
+    @test PlantMeteo.metadata(meteo) == Dict{String,Any}(
+        "name" => "Aquiares",
+        "latitude" => 15.0,
+        "altitude" => 100.0,
+        "use" => [:clearness],
+        "file" => file,
+    )
 end;
