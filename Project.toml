@@ -5,6 +5,7 @@ version = "0.1.2"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataAPI = "9a962f9c-6df0-11e9-0e5d-c546b8b5ee8a"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
@@ -17,8 +18,8 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 [compat]
 CSV = "0.10"
 DataFrames = "1"
-JSON = "0.21"
 HTTP = "1"
+JSON = "0.21"
 Tables = "1"
 Term = "1"
 YAML = "0.4"

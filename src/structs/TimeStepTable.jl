@@ -53,6 +53,25 @@ function TimeStepTable(ts, metadata=NamedTuple())
     TimeStepTable([(; i...) for i in Tables.rows(ts)], metadata)
 end
 
+# DataAPI interface:
+DataAPI.metadatasupport(::Type{<:TimeStepTable}) = (read=true, write=false)
+metadatakeys(t::T) where {T<:TimeStepTable} = keys(getfield(t, :metadata))
+
+function metadata(t::T, key::Union{AbstractString,Symbol}, default=NamedTuple(); style::Bool=false) where {T<:TimeStepTable}
+    meta = getfield(t, :metadata)
+    key = Symbol(key) # Convert to Symbol, we need it as an AbstractString for compatibility with DataAPI but we use Symbols internally
+    if !hasproperty(meta, key)
+        if default === NamedTuple()
+            throw(ArgumentError("\"$key\" not found in table metadata"))
+        else
+            return style ? (default, :default) : default
+        end
+    end
+    return meta[key]
+end
+
+
+# TimeStepRow definition (efficient view-like access to a row in a TimeStepTable):
 
 struct TimeStepRow{T} <: Tables.AbstractRow
     row::Int
@@ -66,7 +85,6 @@ Tables.istable(::Type{TimeStepTable{T}}) where {T} = true
 # Keys should be the same between TimeStepTable so we only need the ones from the first timestep
 Base.keys(ts::TimeStepTable) = getfield(ts, :names)
 names(ts::TimeStepTable) = keys(ts)
-metadata(ts::TimeStepTable) = getfield(ts, :metadata)
 # matrix(ts::TimeStepTable) = reduce(hcat, [[i...] for i in ts])'
 
 function Tables.schema(m::TimeStepTable)

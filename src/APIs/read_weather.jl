@@ -48,7 +48,6 @@ function read_weather(
     date_format=Dates.DateFormat("yyyy-mm-ddTHH:MM:SS.s"),
     hour_format=Dates.DateFormat("HH:MM:SS")
 )
-
     arguments = (args...,)
     data, metadata_ = read_weather_(file)
 
@@ -67,8 +66,8 @@ function read_weather(
         metadata_["use"] = Symbol.(splitted_use[findall(x -> length(x) > 0, splitted_use)])
 
         orig_names = [i.first for i in arguments]
-        new_names = [isa(i.second, Pair) ? i.second.second : i.second for i in arguments]
-        length(arguments) > 0 && replace!(metadata_["use"], Pair.(orig_names, new_names)...)
+        new_names_ = [isa(i.second, Pair) ? i.second.second : i.second for i in arguments]
+        length(arguments) > 0 && replace!(metadata_["use"], Pair.(orig_names, new_names_)...)
     end
     # NB: the "use" field is not used in PlantMeteo, but it is still correctly parsed.
 
