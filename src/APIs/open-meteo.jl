@@ -228,7 +228,7 @@ Fetches the weather forecast from OpenMeteo.com and returns a tuple of:
 - a `NamedTuple` of metadata (e.g. `elevation`, `timezone`, `units`...)
 
 """
-function fetch_openmeteo(url, lat, lon, start_date, end_date, params::OpenMeteo)
+function fetch_openmeteo(url, lat, lon, start_date, end_date, params::T) where {T<:OpenMeteo}
     # Format API parameters:
     API_params = (
         latitude=lat,
@@ -240,7 +240,9 @@ function fetch_openmeteo(url, lat, lon, start_date, end_date, params::OpenMeteo)
         precipitation_unit=params.units.precipitation_unit,
         timezone=params.timezone,
         start_date=start_date,
-        end_date=end_date
+        end_date=end_date,
+        API=T,
+        url=url,
     )
     API_params = join([string(k, "=", v) for (k, v) in pairs(API_params)], "&")
 
