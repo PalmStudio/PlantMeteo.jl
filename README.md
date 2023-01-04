@@ -17,4 +17,7 @@ WIP package to compute and get meteorological or climatic data related to plant 
 - [ ] Add function for sampling historical data with e.g. temperature quartiles.
 - [ ] Add more APIs
 - [ ] Add functions for computing sub-daily data from daily data 
+- [ ] TimeStepTable: Ensure that we don't copy the data when transforming to e.g. `DataFrame`
+- [ ] TimeStepTable: Use views when indexing for better performance
+- [ ] write_weather: don't transform into DataFrame for selecting columns? If so, implement a select of use the one from `TableOperations.jl`
   

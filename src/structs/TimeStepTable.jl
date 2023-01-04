@@ -55,7 +55,7 @@ end
 
 # DataAPI interface:
 DataAPI.metadatasupport(::Type{<:TimeStepTable}) = (read=true, write=false)
-metadatakeys(t::T) where {T<:TimeStepTable} = keys(getfield(t, :metadata))
+metadatakeys(t::T) where {T<:TimeStepTable} = string.(keys(getfield(t, :metadata)))
 
 function metadata(t::T, key::Union{AbstractString,Symbol}, default=NamedTuple(); style::Bool=false) where {T<:TimeStepTable}
     meta = getfield(t, :metadata)
@@ -64,10 +64,10 @@ function metadata(t::T, key::Union{AbstractString,Symbol}, default=NamedTuple();
         if default === NamedTuple()
             throw(ArgumentError("\"$key\" not found in table metadata"))
         else
-            return style ? (default, :default) : default
+            return style ? (default, :note) : default
         end
     end
-    return meta[key]
+    return style ? (meta[key], :note) : meta[key]
 end
 
 
