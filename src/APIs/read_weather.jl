@@ -1,7 +1,9 @@
 """
-    read_weather(file[,args...];
+    read_weather(
+        file[,args...];
         date_format = DateFormat("yyyy-mm-ddTHH:MM:SS.s"),
-        hour_format = DateFormat("HH:MM:SS")
+        hour_format = DateFormat("HH:MM:SS"),
+        duration=nothing
     )
 
 Read a meteo file. The meteo file is a CSV, and optionnaly with metadata in a header formatted
@@ -25,6 +27,9 @@ from the other variables. Please check that all variables have the same units as
 - `args...`: A list of arguments to transform the table. See above to see the possible forms.
 - `date_format = DateFormat("yyyy-mm-ddTHH:MM:SS.s")`: the format for the `DateTime` columns
 - `hour_format = DateFormat("HH:MM:SS")`: the format for the `Time` columns (*e.g.* `hour_start`)
+- `duration`: a function to parse the `duration` column if present in the file. Usually `Dates.Day` or `Dates.Minute`.
+If the column is absent, the duration will be computed using the `hour_format` and the `hour_start` and `hour_end` columns
+along with the `date` column.
 
 # Examples
 
@@ -46,13 +51,15 @@ meteo = read_weather(
 function read_weather(
     file, args...;
     date_format=Dates.DateFormat("yyyy-mm-ddTHH:MM:SS.s"),
-    hour_format=Dates.DateFormat("HH:MM:SS")
+    hour_format=Dates.DateFormat("HH:MM:SS"),
+    duration=nothing
 )
+
     arguments = (args...,)
     data, metadata_ = read_weather_(file)
 
     data.date = compute_date(data, date_format, hour_format)
-    data.duration = compute_duration(data, hour_format)
+    data.duration = compute_duration(data, hour_format, duration)
 
     # Apply the transformations eventually given by the user:
     data = DataFrames.transform(
@@ -62,8 +69,12 @@ function read_weather(
 
     # If there's a "use" field in the YAML, parse it and rename it:
     if haskey(metadata_, "use")
-        splitted_use = split(metadata_["use"], r"[,\s]")
-        metadata_["use"] = Symbol.(splitted_use[findall(x -> length(x) > 0, splitted_use)])
+        # Old format (deprecated, but used by ARCHIMED) uses "use" => "clearness, test"
+        # instead of a proper YAML list. So we have to parse it:
+        if isa(metadata_["use"], String)
+            splitted_use = split(metadata_["use"], r"[,\s]")
+            metadata_["use"] = Symbol.(splitted_use[findall(x -> length(x) > 0, splitted_use)])
+        end
 
         orig_names = [i.first for i in arguments]
         new_names_ = [isa(i.second, Pair) ? i.second.second : i.second for i in arguments]
@@ -124,10 +135,11 @@ function compute_date(
         # Trying to parse it with the user-defined format:
         date = try
             Dates.Date.(data.date, date_format)
-        catch
+        catch e
             error(
                 "The values in the `date` column cannot be parsed.",
-                " Please check the format of the dates or provide the format as argument."
+                " Please check the format of the dates or provide the format as argument.",
+                e
             )
         end
 
@@ -141,10 +153,11 @@ function compute_date(
                 date = try
                     # Adding the Time to the Date to make a DateTime:
                     date .+ Dates.Time.(data.hour_start, hour_format)
-                catch
+                catch e
                     error(
                         "The values in the `hour_start` column cannot be parsed.",
-                        " Please check the format of the hours or provide the format as argument."
+                        " Please check the format of the hours or provide the format as argument.",
+                        e
                     )
                 end
             else
@@ -160,20 +173,37 @@ end
 
 
 """
-    compute_duration(data, hour_format)
+    compute_duration(data, hour_format, duration)
 
 Compute the `duration` column depending on several cases:
 
-- If it is already in the data, does nothing.
+- If it is already in the data, use the `duration` function to parse it into a `Date.Period`.
 - If it is not, but there's a column named `hour_end` and another one either called `hour_start`
 or `date`, compute the duration from the period between `hour_start` (or `date`) and `hour_end`.
 
 # Arguments
+
 - `data`: any `Tables.jl` compatible table, such as a `DataFrame`
 - `hour_format`: a `DateFormat` to parse the `hour_start` and `hour_end` columns if they are `String`s.
+- `duration`: a function to parse the `duration` column. Usually `Dates.Day` or `Dates.Minute`.
 """
-function compute_duration(data, hour_format=Dates.DateFormat("HH:MM:SS"))
-    if hasproperty(data, :hour_end) && !hasproperty(data, :duration)
+function compute_duration(data, hour_format=Dates.DateFormat("HH:MM:SS"), duration=nothing)
+
+    if hasproperty(data, :duration)
+        duration === nothing && error("The `duration` column is already in the data, please provide the `duration` argument")
+
+        # If the duration is a String, we try to parse it as a Period with the user-defined format:
+        # time period unit
+        duration = try
+            duration.(data.duration)
+        catch e
+            error(
+                "The values in the `duration` column cannot be parsed.",
+                " Please check the format of the durations or provide the period unit as argument (e.g. Dates.Minute).",
+                e
+            )
+        end
+    elseif hasproperty(data, :hour_end) && !hasproperty(data, :duration)
         hour_end = parse_hour.(data.hour_end, hour_format)
 
         if hasproperty(data, :hour_start)
@@ -187,7 +217,7 @@ function compute_duration(data, hour_format=Dates.DateFormat("HH:MM:SS"))
         # time steps:
         if hasproperty(data, :DateTime)
             duration = timesteps_durations(data.DateTime)
-        elseif hasproperty(data, :date) && data.date[1] == Dates.DateTime
+        elseif hasproperty(data, :date) && isa(data.date[1], Dates.DateTime)
             duration = timesteps_durations(data.date)
         elseif hasproperty(data, :date) && data.date[1] == Dates.Date && hasproperty(data, :hour_start)
             hour_start = parse_hour.(data.hour_start, hour_format)
@@ -248,10 +278,11 @@ function parse_hour(h, hour_format=Dates.DateFormat("HH:MM:SS"))
     if typeof(h) == String
         try
             h = Dates.Time(h, hour_format)
-        catch
+        catch e
             error(
                 "Hour $h cannot be parsed into a Dates.Time with format $hour_format.",
-                " Please check the format of the hours or provide the format as argument."
+                " Please check the format of the hours or provide the format as argument.",
+                e
             )
         end
     end
