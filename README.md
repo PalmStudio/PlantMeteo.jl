@@ -13,7 +13,7 @@ WIP package to compute and get meteorological or climatic data related to plant 
 - [x] Add a generic interface for the weather forecast and history APIs
 - [x] Add one meteo API (open-meteo)
 - [x] Add a function for integrating sub-daily data into daily data, and check that sum(durations) == 24 hours
-- [ ] Add function to write meteo data (avoiding to write computed variables such as ρ or λ)
+- [x] Add function to write meteo data (avoiding to write computed variables such as ρ or λ)
 - [ ] Add function for sampling historical data with e.g. temperature quartiles.
 - [ ] Add more APIs
 - [ ] Add functions for computing sub-daily data from daily data 
