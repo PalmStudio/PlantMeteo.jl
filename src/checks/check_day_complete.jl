@@ -19,9 +19,11 @@ function check_day_complete(df)
     end
 
     # Compute the cumulated duration of each day
-    duration_s = 0 # duration in seconds
+    duration_s = df.duration[1]
     prev_day = dayofyear[1]
     for (i, day) in enumerate(dayofyear)
+        i == 1 && continue
+
         if day == prev_day
             # We are in the same day than the iteration before, so we cumulate
             duration_s += df.duration[i]
