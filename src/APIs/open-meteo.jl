@@ -196,7 +196,7 @@ function get_forecast(params::OpenMeteo, lat, lon, period; verbose=true)
     atms_archive = Atmosphere[]
 
     if period[1] <= archive_date
-        @info """Open-Meteo.com "forecast" data does not go beyond -196 days ($archive_date).
+        verbose && @info """Open-Meteo.com "forecast" data does not go beyond -196 days ($archive_date).
         Fetching Era5 data for previous dates (0.25° resolution, ~25-30km).        
         """
 
@@ -290,12 +290,18 @@ function format_openmeteo!(data; verbose=true)
             P = Float64(P) / 10.0
         end
 
+        # To avoid warnings in atmosphere:
+        Wind = Float64(data["hourly"]["windspeed_10m"][i])
+        if Wind <= 0.0
+            Wind = 1.0e-6
+        end
+
         push!(atms,
             Atmosphere(
                 date=datetime[i],
                 duration=duration[i],
                 T=Float64(data["hourly"]["temperature_2m"][i]),
-                Wind=Float64(data["hourly"]["windspeed_10m"][i]),
+                Wind=Wind,
                 Rh=Float64(data["hourly"]["relativehumidity_2m"][i]) / 100.0,
                 P=P,
                 Precipitations=Float64(data["hourly"]["precipitation"][i]),
