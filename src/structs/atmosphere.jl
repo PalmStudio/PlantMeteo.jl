@@ -62,18 +62,18 @@ function Atmosphere(;
 
     # Checking some values:
     if Wind <= 0.0
-        @warn "Wind ($Wind) should always be > 0, forcing it to 1e-6"
+        @warn "Wind ($Wind) should always be > 0, forcing it to 1e-6" maxlog = 1
         Wind = 1.0e-6
     end
 
     if Rh <= 0.0
-        @warn "Rh ($Rh) should always be > 0, forcing it to 1e-6"
+        @warn "Rh ($Rh) should always be > 0, forcing it to 1e-6" maxlog = 1
         Rh = 1.0e-6
     end
 
     if Rh > 1.0
         if 1.0 < Rh < 100.0
-            @warn "Rh ($Rh) should be 0 < Rh < 1, assuming it is given in % and dividing by 100"
+            @warn "Rh ($Rh) should be 0 < Rh < 1, assuming it is given in % and dividing by 100" maxlog = 1
             Rh /= 100.0
         else
             @error "Rh ($Rh) should be 0 < Rh < 1"
@@ -81,7 +81,7 @@ function Atmosphere(;
     end
 
     if P <= 87.0 || P >= 110.0 # ~ max and min pressure on Earth
-        @warn "P ($P) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it"
+        @warn "P ($P) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it" maxlog = 1
     end
 
     if clearness != Inf && (clearness <= 0.0 || clearness > 1.0)
