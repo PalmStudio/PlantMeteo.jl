@@ -53,6 +53,9 @@ function to_daily(df::DataFrames.DataFrame, args...)
         df.dayofyear = Dates.dayofyear.(df.date)
     end
 
+    # Check that the durations in a day sum up to 24h (86400ms):
+    check_day_complete(df)
+
     def_trans = default_transformation(df)
     def_trans_names = new_names(def_trans)
     user_trans_names = new_names(args)
@@ -131,12 +134,13 @@ function default_transformation(df)
 
     # The date is only a Date now (and not a DateTime):
     add_transformations!(df, trans, (:date,), (x -> unique(Dates.Date.(x))); error_missing=false)
+    add_transformations!(df, trans, (:duration,), (x -> Dates.Day.(sum(x))); error_missing=false)
 
     # Compute Tmin, Tmax, and cumulate time-steps durations and Precipitations:
     add_transformations!(df, trans, (:T => :Tmin,), minimum; error_missing=false)
     add_transformations!(df, trans, (:T => :Tmax,), maximum; error_missing=false)
     add_transformations!(df, trans, (:T,), Statistics.mean; error_missing=false)
-    add_transformations!(df, trans, (:duration, :Precipitations), sum; error_missing=false)
+    add_transformations!(df, trans, (:Precipitations,), sum; error_missing=false)
 
     # Compute the average of the following variables:
     to_average = (
