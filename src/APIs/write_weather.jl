@@ -1,7 +1,7 @@
 """
     write_weather(
         file, w; 
-        select=setdiff(propertynames(w), ATMOSPHERE_COMPUTED),
+        vars=setdiff(propertynames(w), ATMOSPHERE_COMPUTED),
         duration=Dates.Minute
     )
 
@@ -11,7 +11,7 @@ Write the weather data to a file.
 
 - `file`: a `String` representing the path to the file to write
 - `w`: a `TimeStepTable{Atmosphere}`
-- `select`: a vector of variables to write (as symbols). By default, all variables are written except the ones that 
+- `vars`: a vector of variables to write (as symbols). By default, all variables are written except the ones that 
 can be recomputed (see [`ATMOSPHERE_COMPUTED`](@ref)). If `nothing` is given, all variables are written.
 - `duration`: the unit for formating the duration of the time steps. By default, it is `Dates.Minute`.
 
@@ -34,30 +34,62 @@ write_weather("meteo.csv", w)
 ```
 """
 function write_weather(
-    file::String, w::T;
-    select=setdiff(propertynames(w), ATMOSPHERE_COMPUTED),
+    file::String, w;
+    vars=setdiff(propertynames(w), ATMOSPHERE_COMPUTED),
     duration=Dates.Minute
-) where {T<:TimeStepTable{<:Atmosphere}}
+)
+    df = prepare_weather(w; vars=vars, duration=duration)
 
-    if select !== nothing
-        select_ = [select...]
-        for var in select
-            # var = :date
-            # check if the variables are in the table, if not remove them from the selection:
-            if !hasproperty(w, var)
-                popat!(select_, findfirst(select_ .== var))
-            else
-                # Remove variables with all values at != Inf (default value, we don't need to write it)
-                if all(w[var] .== Inf)
-                    popat!(select_, findfirst(select_ .== var))
-                end
-            end
-        end
-    end
+    # Standardize the column names (e.g. :λ -> :lambda):
+    standardize_columns!(df)
 
-    # select the variables:
-    df = DataFrames.DataFrame(w)[:, select_] #! do we really need the conversion to df here ? 
+    write_weather_(file, df)
+end
 
+"""
+    prepare_weather(
+        w;
+        vars=setdiff(propertynames(w), ATMOSPHERE_COMPUTED),
+        duration=Dates.Minute
+    )
+
+Prepare the weather data for writing to a file. The function returns a 
+`DataFrame` with the selected variables and the duration formated.
+
+# Arguments
+
+- `w`: a `Tables.jl` interfaced table, such as a `TimeStepTable{Atmosphere}` or a `DataFrame`
+- `vars`: a vector of variables to write (as symbols). By default, all variables are written except the ones that
+can be recomputed (see [`ATMOSPHERE_COMPUTED`](@ref)). If `nothing` is given, all variables are written.
+- `duration`: the unit for formating the duration of the time steps. By default, it is `Dates.Minute`
+
+# Examples
+
+```julia
+using PlantMeteo, Dates
+
+file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
+w = read_weather(
+    file,
+    :temperature => :T,
+    :relativeHumidity => (x -> x ./100) => :Rh,
+    :wind => :Wind,
+    :atmosphereCO2_ppm => :Cₐ,
+    date_format = DateFormat("yyyy/mm/dd")
+)
+
+df = prepare_weather(w)
+```
+"""
+function prepare_weather(
+    w;
+    vars=setdiff(propertynames(w), ATMOSPHERE_COMPUTED),
+    duration=Dates.Minute
+)
+    Tables.istable(w) || throw(ArgumentError("The weather data must be interfaced with `Tables.jl`."))
+
+    df = DataFrames.DataFrame(w)
+    df = select_weather(df, vars)
     # add the duration format:
     DataFrames.metadata!(df, "duration", duration, style=:note)
 
@@ -65,7 +97,60 @@ function write_weather(
         df.duration = Dates.value.(duration.(Dates.Millisecond.(Dates.toms.(w.duration))))
     end
 
-    write_weather_(file, df)
+    df
+end
+
+
+"""
+    select_weather(w, vars=setdiff(propertynames(w), ATMOSPHERE_COMPUTED))
+
+vars the variables to write in the weather data. The function returns a `DataFrame` with the selected variables.
+
+# Arguments
+
+- `w`: a `Tables.jl` interfaced table, such as a `TimeStepTable{Atmosphere}` or a `DataFrame`
+- `vars`: a vector of variables to write (as symbols). By default, all variables are written except the ones that
+can be recomputed (see [`ATMOSPHERE_COMPUTED`](@ref)). If `nothing` is given, all variables are written.
+
+# Examples
+
+```julia
+using PlantMeteo, Dates
+
+file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
+w = read_weather(
+    file,
+    :temperature => :T,
+    :relativeHumidity => (x -> x ./100) => :Rh,
+    :wind => :Wind,
+    :atmosphereCO2_ppm => :Cₐ,
+    date_format = DateFormat("yyyy/mm/dd")
+)
+
+df = select_weather(w)
+```
+"""
+function select_weather(w, vars=setdiff(propertynames(w), ATMOSPHERE_COMPUTED))
+
+    Tables.istable(w) || throw(ArgumentError("The weather data must be interfaced with `Tables.jl`."))
+
+    if vars !== nothing
+        vars_ = [vars...]
+        for var in vars
+            # check if the variables are in the table, if not remove them from the selection:
+            if !hasproperty(w, var)
+                popat!(vars_, findfirst(vars_ .== var))
+            else
+                # Remove variables with all values at Inf (default value, we don't need to write it)
+                if all(Tables.getcolumn(w, var) .== Inf)
+                    popat!(vars_, findfirst(vars_ .== var))
+                end
+            end
+        end
+    end
+
+    # select the variables and return:
+    return DataFrames.select(DataFrames.DataFrame(w), vars_)
 end
 
 """
@@ -73,9 +158,55 @@ end
 
 List of variables that are by default removed from the table when using `write_weather` on a TimeStepTable{Atmosphere}.
 """
-const ATMOSPHERE_COMPUTED = [
-    (:e, :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ)
-]
+const ATMOSPHERE_COMPUTED = [:e, :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ]
+
+const ATMOSPHERE_NONSTANDARD_NAMES = (
+    Cₐ=:Ca, eₛ=:es, ρ=:rho, λ=:lambda, γ=:gamma, ε=:epsilon, Δ=:Delta
+)
+
+"""
+    standardize_columns!(df)
+
+Standardize the column names of a `DataFrame` built upon `Atmosphere`s to be compatible with standard
+file systems (CSV, databases...).
+
+# Arguments
+
+- `df`: a `DataFrame` built upon `Atmosphere`s
+
+# Examples
+
+```julia
+using PlantMeteo, Dates, DataFrames
+
+file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
+
+df = read_weather(
+    file,
+    :temperature => :T,
+    :relativeHumidity => (x -> x ./100) => :Rh,
+    :wind => :Wind,
+    :atmosphereCO2_ppm => :Cₐ,
+    date_format = DateFormat("yyyy/mm/dd")
+) |> DataFrame
+
+df = standardize_columns!(df)
+```
+"""
+function standardize_columns!(df)
+
+    to_rename = Pair{Symbol,Symbol}[]
+
+    # if the variable is in the list of non-standard names, add it to the renaming vector of pairs:
+    for var in propertynames(df)
+        if var in keys(ATMOSPHERE_NONSTANDARD_NAMES)
+            push!(to_rename, var => ATMOSPHERE_NONSTANDARD_NAMES[var])
+        end
+    end
+
+    # rename the variables:
+    length(to_rename) > 0 && DataFrames.rename!(df, to_rename)
+end
 
 """
     write_weather_(file, w)
