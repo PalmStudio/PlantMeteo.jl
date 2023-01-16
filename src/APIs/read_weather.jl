@@ -67,6 +67,9 @@ function read_weather(
         arguments...
     )
 
+    # Rename the columns to the PlantMeteo convention (if any):
+    standardize_columns!(ToPlantMeteoColumns(), data)
+
     # If there's a "use" field in the YAML, parse it and rename it:
     if haskey(metadata_, "use")
         # Old format (deprecated, but used by ARCHIMED) uses "use" => "clearness, test"

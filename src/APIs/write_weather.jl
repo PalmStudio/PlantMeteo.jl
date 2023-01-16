@@ -41,7 +41,7 @@ function write_weather(
     df = prepare_weather(w; vars=vars, duration=duration)
 
     # Standardize the column names (e.g. :λ -> :lambda):
-    standardize_columns!(df)
+    standardize_columns!(ToFileColumns(), df)
 
     write_weather_(file, df)
 end
@@ -153,60 +153,6 @@ function select_weather(w, vars=setdiff(propertynames(w), ATMOSPHERE_COMPUTED))
     return DataFrames.select(DataFrames.DataFrame(w), vars_)
 end
 
-"""
-    ATMOSPHERE_SELECT
-
-List of variables that are by default removed from the table when using `write_weather` on a TimeStepTable{Atmosphere}.
-"""
-const ATMOSPHERE_COMPUTED = [:e, :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ]
-
-const ATMOSPHERE_NONSTANDARD_NAMES = (
-    Cₐ=:Ca, eₛ=:es, ρ=:rho, λ=:lambda, γ=:gamma, ε=:epsilon, Δ=:Delta
-)
-
-"""
-    standardize_columns!(df)
-
-Standardize the column names of a `DataFrame` built upon `Atmosphere`s to be compatible with standard
-file systems (CSV, databases...).
-
-# Arguments
-
-- `df`: a `DataFrame` built upon `Atmosphere`s
-
-# Examples
-
-```julia
-using PlantMeteo, Dates, DataFrames
-
-file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
-
-df = read_weather(
-    file,
-    :temperature => :T,
-    :relativeHumidity => (x -> x ./100) => :Rh,
-    :wind => :Wind,
-    :atmosphereCO2_ppm => :Cₐ,
-    date_format = DateFormat("yyyy/mm/dd")
-) |> DataFrame
-
-df = standardize_columns!(df)
-```
-"""
-function standardize_columns!(df)
-
-    to_rename = Pair{Symbol,Symbol}[]
-
-    # if the variable is in the list of non-standard names, add it to the renaming vector of pairs:
-    for var in propertynames(df)
-        if var in keys(ATMOSPHERE_NONSTANDARD_NAMES)
-            push!(to_rename, var => ATMOSPHERE_NONSTANDARD_NAMES[var])
-        end
-    end
-
-    # rename the variables:
-    length(to_rename) > 0 && DataFrames.rename!(df, to_rename)
-end
 
 """
     write_weather_(file, w)
@@ -236,5 +182,5 @@ function write_weather_(file::String, w)
         append = false
     end
     # write the data:
-    CSV.write(file, w; append=append, writeheader=true)
+    CSV.write(file, w; append=append, header=true)
 end
