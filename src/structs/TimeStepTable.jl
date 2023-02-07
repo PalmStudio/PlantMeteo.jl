@@ -234,7 +234,7 @@ function Base.show(io::IO, t::TimeStepTable{T}) where {T}
 
     T_string = string(T)
     if length(T_string) > 30
-        T_string = string(T_string[1:30], "...")
+        T_string = string(T_string[1:prevind(T_string, 30)], "...")
     end
 
     print(
