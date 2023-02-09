@@ -60,6 +60,12 @@ function Atmosphere(;
     args...
 ) where {D1<:Dates.AbstractTime}
 
+    for (k, v) in (; T, Wind, P, Rh, date, duration)
+        if ismissing(v)
+            throw(ArgumentError("$k must be different than missing"))
+        end
+    end
+
     # Checking some values:
     if Wind <= 0.0
         @warn "Wind ($Wind) should always be > 0, forcing it to 1e-6" maxlog = 1
@@ -80,11 +86,11 @@ function Atmosphere(;
         end
     end
 
-    if P <= 87.0 || P >= 110.0 # ~ max and min pressure on Earth
+    if !ismissing(P) && P <= 87.0 || P >= 110.0 # ~ max and min pressure on Earth
         @warn "P ($P) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it" maxlog = 1
     end
 
-    if clearness != Inf && (clearness <= 0.0 || clearness > 1.0)
+    if !ismissing(clearness) && clearness != Inf && (clearness <= 0.0 || clearness > 1.0)
         @error "clearness ($clearness) should always be 0 < clearness < 1"
     end
 
