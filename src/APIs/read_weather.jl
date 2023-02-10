@@ -58,14 +58,14 @@ function read_weather(
     arguments = (args...,)
     data, metadata_ = read_weather_(file)
 
-    data.date = compute_date(data, date_format, hour_format)
-    data.duration = compute_duration(data, hour_format, duration)
-
     # Apply the transformations eventually given by the user:
     data = DataFrames.transform(
         data,
         arguments...
     )
+
+    data.date = compute_date(data, date_format, hour_format)
+    data.duration = compute_duration(data, hour_format, duration)
 
     # Rename the columns to the PlantMeteo convention (if any):
     standardize_columns!(ToPlantMeteoColumns(), data)
