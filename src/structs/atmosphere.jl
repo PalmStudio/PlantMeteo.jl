@@ -60,9 +60,9 @@ function Atmosphere(;
     args...
 ) where {D1<:Dates.AbstractTime}
 
-    for (k, v) in (; T, Wind, P, Rh, date, duration)
-        if ismissing(v)
-            throw(ArgumentError("$k must be different than missing"))
+    for p in pairs((; T, Wind, P, Rh, date, duration))
+        if ismissing(p.second)
+            throw(ArgumentError("$(p.first) must be different than missing"))
         end
     end
 
