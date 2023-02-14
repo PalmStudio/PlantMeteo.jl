@@ -50,12 +50,14 @@ function TimeStepTable(ts::V, metadata::D) where {V<:Vector,D<:Dict}
 end
 
 function TimeStepTable{T}(ts, metadata=NamedTuple()) where {T}
-    TimeStepTable([T(; i...) for i in Tables.rows(ts)], metadata)
+    TimeStepTable([T(; i...) for i in Tables.namedtupleiterator(ts)], metadata)
 end
 
 function TimeStepTable(ts, metadata=NamedTuple())
-    TimeStepTable([(; i...) for i in Tables.rows(ts)], metadata)
+    TimeStepTable([ts for i in Tables.namedtupleiterator(ts)], metadata)
 end
+
+Tables.materializer(t::TimeStepTable{T}) where {T} = TimeStepTable{T}
 
 # DataAPI interface:
 DataAPI.metadatasupport(::Type{<:TimeStepTable}) = (read=true, write=false)
