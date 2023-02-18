@@ -118,21 +118,40 @@ Tables.columnnames(ts::TimeStepTable) = getfield(ts, :names)
 Base.iterate(t::TimeStepTable{T}, st=1) where {T} = st > length(t) ? nothing : (TimeStepRow(st, t), st + 1)
 Base.size(t::TimeStepTable{T}, dim=1) where {T} = dim == 1 ? length(t) : length(getfield(t, :names))
 
-function Tables.getcolumn(row::TimeStepRow, i::Int)
-    return getfield(getfield(row, :source), :ts)[getfield(row, :row)][i]
+"""
+    row_struct(ts::TimeStepRow)
+
+Get `TimeStepRow` in its raw format, *e.g.* the `NamedTuple` that stores the values, 
+or the `Atmosphere` of values (or `Status` for `PlantSimEngine.jl`).
+"""
+function row_struct(row::TimeStepRow)
+    getfield(getfield(row, :source), :ts)[getfield(row, :row)]
 end
-Tables.getcolumn(row::TimeStepRow, nm::Symbol) =
-    getfield(getfield(row, :source), :ts)[getfield(row, :row)][nm]
+
+"""
+    Tables.getcolumn(row::TimeStepRow, nm::Symbol)
+    Tables.getcolumn(row::TimeStepRow, nm::Int)
+
+Get the value of a variable in a `TimeStepRow` object.
+"""
+Tables.getcolumn(row::TimeStepRow, i) = row_struct(row)[i]
+# Defining the following to avoid ambiguity warnings:
+Tables.getcolumn(row::TimeStepRow, nm::Symbol) = row_struct(row)[nm]
+
 Tables.columnnames(row::TimeStepRow) = getfield(getfield(row, :source), :names)
 
-function Base.setindex!(row::TimeStepRow, x, i::Int)
-    st = getfield(getfield(row, :source), :ts)[getfield(row, :row)]
-    setproperty!(st, i, x)
+"""
+    setindex!(row::TimeStepRow, nm::Symbol)
+    setindex!(row::TimeStepRow, i::Int)
+
+Set the value of a variable in a `TimeStepRow` object.
+"""
+function Base.setindex!(row::TimeStepRow, x, i)
+    setproperty!(row_struct(row), i, x)
 end
 
 function Base.setproperty!(row::TimeStepRow, nm::Symbol, x)
-    st = getfield(getfield(row, :source), :ts)[getfield(row, :row)]
-    setproperty!(st, nm, x)
+    setproperty!(row_struct(row), nm, x)
 end
 
 ##### Indexing and setting:
@@ -150,6 +169,10 @@ end
 # Indexing with a Symbol extracts the variable (same as getproperty):
 function Base.getindex(ts::TimeStepTable, index::Symbol)
     getproperty(ts, index)
+end
+
+function Base.getindex(ts::TimeStepTable, index)
+    getproperty(ts, Symbol(index))
 end
 
 # Setting the values of a variable in a TimeStepTable object is done by indexing the object
@@ -187,23 +210,12 @@ end
 end
 
 """
-    get_index_raw(ts::TimeStepTable, i::Integer)
 
 Get row from `TimeStepTable` in its raw format, *e.g.* as a `NamedTuple`
 or `Atmosphere` of values.
 """
 function get_index_raw(ts::TimeStepTable, i::Integer)
-    raw_row(ts[i])
-end
-
-"""
-    raw_row(ts::TimeStepRow)
-
-Get `TimeStepRow` in its raw format, *e.g.* as a `NamedTuple`
-or `Atmosphere` of values.
-"""
-function raw_row(row::TimeStepRow)
-    getfield(getfield(row, :source), :ts)[getfield(row, :row)]
+    row_struct(ts[i])
 end
 
 Base.lastindex(ts::TimeStepTable) = length(ts)
