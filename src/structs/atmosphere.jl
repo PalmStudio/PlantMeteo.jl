@@ -14,11 +14,12 @@ Atmosphere structure to hold all values related to the meteorology / atmosphere.
 - `duration<:Period = Dates.Second(1.0)`: the duration of the time-step in Dates.Period.
 - `T` (°C): air temperature
 - `Wind` (m s-1): wind speed
-- `P = 101.325` (kPa): air pressure. The default value is at 1 atm, *i.e.* the mean sea-level
+- `Rh` (0-1): relative humidity (can be computed using `rh_from_vpd`)
+- `P = DEFAULTS.P` (kPa): air pressure. The default value is at 1 atm, *i.e.* the mean sea-level
 atmospheric pressure on Earth.
-- `Rh = rh_from_vpd(VPD,eₛ)` (0-1): relative humidity
-- `Precipitations=0.0` (mm): precipitations from atmosphere (*i.e.* rain, snow, hail, etc.)
-- `Cₐ` (ppm): air CO₂ concentration
+- `Precipitations = DEFAULTS.Precipitations` (mm): precipitations from atmosphere (*i.e.* rain, snow, hail, etc.)
+- `Cₐ = DEFAULTS.Cₐ` (ppm): air CO₂ concentration
+- `check = true`: whether to check the validity of the input values.
 - `e = vapor_pressure(T,Rh)` (kPa): vapor pressure
 - `eₛ = e_sat(T)` (kPa): saturated vapor pressure
 - `VPD = eₛ - e` (kPa): vapor pressure deficit
@@ -51,12 +52,11 @@ end
 
 function Atmosphere(;
     T, Wind, Rh, date::D1=Dates.now(), duration=Dates.Second(1.0), P=DEFAULTS.P,
-    Precipitations=DEFAULTS.Precipitations,
-    Cₐ=DEFAULTS.Cₐ, e=vapor_pressure(T, Rh), eₛ=e_sat(T), VPD=eₛ - e,
-    ρ=air_density(T, P), λ=latent_heat_vaporization(T),
-    γ=psychrometer_constant(P, λ), ε=atmosphere_emissivity(T, e),
-    Δ=e_sat_slope(T), clearness=Inf, Ri_SW_f=Inf, Ri_PAR_f=Inf,
-    Ri_NIR_f=Inf, Ri_TIR_f=Inf, Ri_custom_f=Inf,
+    Precipitations=DEFAULTS.Precipitations, Cₐ=DEFAULTS.Cₐ, check=true,
+    e=vapor_pressure(T, Rh, check=check), eₛ=e_sat(T), VPD=eₛ - e, ρ=air_density(T, P, check=check),
+    λ=latent_heat_vaporization(T), γ=psychrometer_constant(P, λ, check=check),
+    ε=atmosphere_emissivity(T, e), Δ=e_sat_slope(T), clearness=Inf,
+    Ri_SW_f=Inf, Ri_PAR_f=Inf, Ri_NIR_f=Inf, Ri_TIR_f=Inf, Ri_custom_f=Inf,
     args...
 ) where {D1<:Dates.AbstractTime}
 
