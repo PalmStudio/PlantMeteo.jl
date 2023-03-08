@@ -1,10 +1,17 @@
 """
-    vapor_pressure(Tₐ, rh)
+    vapor_pressure(Tₐ, Rh)
 
 Vapor pressure (kPa) at given temperature (°C) and relative hunidity (0-1).
+
+# Examples
+
+```julia
+vapor_pressure(25.0, 0.4)
+```
 """
-function vapor_pressure(Tₐ, rh)
-    rh * e_sat(Tₐ)
+function vapor_pressure(Tₐ, Rh)
+    Rh > 1.0 && throw(ArgumentError("Relative humidity must be between 0 and 1"))
+    Rh * e_sat(Tₐ)
 end
 
 

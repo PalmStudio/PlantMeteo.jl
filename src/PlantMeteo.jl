@@ -32,7 +32,7 @@ export get_index_raw
 export atmosphere_emissivity, vapor_pressure
 export e_sat, air_density, latent_heat_vaporization
 export psychrometer_constant
-export rh_from_vpd, rh_from_e, vpd
+export rh_from_vpd, rh_from_e, vpd, vpd_from_e
 export metadata, metadatakeys
 export read_weather, write_weather
 export get_forecast
