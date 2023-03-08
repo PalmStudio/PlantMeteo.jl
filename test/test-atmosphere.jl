@@ -21,14 +21,9 @@
     )
 
     # Testing Rh with values given in %:
-    @test_logs (:warn, "Rh (30) should be 0 < Rh < 1, assuming it is given in % and dividing by 100") Atmosphere(T=25, Wind=5, Rh=30)
-    # Testing Rh with values given with wrong value:
-    @test_logs (:error, "Rh (300) should be 0 < Rh < 1") Atmosphere(T=25, Wind=5, Rh=300)
+    @test_throws "Relative humidity (30) must be between 0 and 1" Atmosphere(T=25, Wind=5, Rh=30)
 
-    @test_logs (:warn, "P (10.0) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it") Atmosphere(T=25, Wind=5, Rh=0.3, P=10.0)
-    @test_logs (:warn, "P (1003.0) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it") Atmosphere(T=25, Wind=5, Rh=0.3, P=1003.0)
-
-
-    test_met = Atmosphere(T=25, Wind=5, Rh=30)
-    @test test_met.Rh == 0.3
+    @test_throws "Air pressure (10.0) is not in the 87-110 kPa earth range" Atmosphere(T=25, Wind=5, Rh=0.3, P=10.0)
+    @test_throws "Air pressure (1003.0) is not in the 87-110 kPa earth range" Atmosphere(T=25, Wind=5, Rh=0.3, P=1003.0)
+    @test_logs (:warn, "P (1003.0) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it") Atmosphere(T=25, Wind=5, Rh=0.3, P=1003.0, check=false)
 end;
