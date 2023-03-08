@@ -1,5 +1,5 @@
 """
-    vapor_pressure(Tₐ, Rh, check=true)
+    vapor_pressure(Tₐ, Rh; check=true)
 
 Vapor pressure (kPa) at given temperature (°C) and relative hunidity (0-1).
 
@@ -15,7 +15,7 @@ Vapor pressure (kPa) at given temperature (°C) and relative hunidity (0-1).
 vapor_pressure(25.0, 0.4)
 ```
 """
-function vapor_pressure(Tₐ, Rh, check=true)
+function vapor_pressure(Tₐ, Rh; check=true)
     check && Rh > 1.0 && throw(ArgumentError("Relative humidity ($Rh) must be between 0 and 1"))
     Rh * e_sat(Tₐ)
 end
@@ -42,8 +42,8 @@ end
 
 
 """
-    air_density(Tₐ, P, check=true)
-    air_density(Tₐ, P, Rd, K₀, check=true)
+    air_density(Tₐ, P; check=true)
+    air_density(Tₐ, P, Rd, K₀; check=true)
 
 ρ, the air density (kg m-3).
 
@@ -63,19 +63,19 @@ Rd and K₀ are Taken from [`Constants`](@ref) if not provided.
 
 Foken, T, 2008: Micrometeorology. Springer, Berlin, Germany.
 """
-function air_density(Tₐ, P, Rd, K₀, check=true)
-    check && P <= 87.0 || P >= 110.0 && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
+function air_density(Tₐ, P, Rd, K₀; check=true)
+    check && (P <= 87.0 || P >= 110.0) && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
     (P * 1000) / (Rd * (Tₐ - K₀))
 end
 
-function air_density(Tₐ, P, check=true)
+function air_density(Tₐ, P; check=true)
     constants = Constants()
-    air_density(Tₐ, P, constants.Rd, constants.K₀, check)
+    air_density(Tₐ, P, constants.Rd, constants.K₀; check=check)
 end
 
 """
-    psychrometer_constant(P, λ, Cₚ, ε, check=true)
-    psychrometer_constant(P, λ, check=true)
+    psychrometer_constant(P, λ, Cₚ, ε; check=true)
+    psychrometer_constant(P, λ; check=true)
 
 γ, the psychrometer constant, also called psychrometric constant (kPa K−1). See Monteith and
 Unsworth (2013), p. 222.
@@ -107,15 +107,15 @@ Water Surfaces, Soil, and Vegetation ». In Principles of Environmental Physics
 edited by John L. Monteith et Mike H. Unsworth, 217‑47. Boston: Academic Press.
 
 """
-function psychrometer_constant(P, λ, Cₚ, ε, check=true)
-    check && P <= 87.0 || P >= 110.0 && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
+function psychrometer_constant(P, λ, Cₚ, ε; check=true)
+    check && (P <= 87.0 || P >= 110.0) && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
     γ = (Cₚ * P) / (ε * λ)
     return γ
 end
 
-function psychrometer_constant(P, λ, check=true)
+function psychrometer_constant(P, λ; check=true)
     constant = Constants()
-    check && P <= 87.0 || P >= 110.0 && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
+    check && (P <= 87.0 || P >= 110.0) && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
     γ = (constant.Cₚ * P) / (constant.ε * λ)
     return γ
 end
