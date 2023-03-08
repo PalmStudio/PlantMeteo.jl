@@ -191,12 +191,12 @@ function get_forecast(params::OpenMeteo, lat, lon, period; verbose=true)
 
     # The ~1km scale forecast API history does not go beyond 196 days 
     # before today:
-    start_archive = -Dates.Day(196)
+    start_archive = -Dates.Day(173)
     archive_date = Dates.today() + Dates.Day(start_archive) - Dates.Day(1)
     atms_archive = Atmosphere[]
 
     if period[1] <= archive_date
-        verbose && @info """Open-Meteo.com "forecast" data does not go beyond -196 days ($archive_date).
+        verbose && @info """Open-Meteo.com "forecast" data does not go beyond -173 days ($archive_date).
         Fetching Era5 data for previous dates (0.25° resolution, ~25-30km).        
         """
 
@@ -291,23 +291,34 @@ function format_openmeteo!(data; verbose=true)
         end
 
         # To avoid warnings in atmosphere:
-        Wind = Float64(data["hourly"]["windspeed_10m"][i])
-        if Wind <= 0.0
+        if data["hourly"]["windspeed_10m"][i] === nothing
             Wind = 1.0e-6
+        else
+            Wind = Float64(data["hourly"]["windspeed_10m"][i])
+            if Wind <= 0.0
+                Wind = 1.0e-6
+            end
         end
+
+        T = check_and_parse(data["hourly"]["temperature_2m"][i], "Temperature", datetime[i])
+        Rh = check_and_parse(data["hourly"]["relativehumidity_2m"][i], "Relative humidity", datetime[i]) / 100.0
+        Precip = check_and_parse(data["hourly"]["precipitation"][i], "Precipitation", datetime[i])
+        Ri_SW_f = check_and_parse(data["hourly"]["shortwave_radiation"][i], "Shortwave radiation", datetime[i])
+        Ri_SW_f_direct = check_and_parse(data["hourly"]["direct_radiation"][i], "Direct radiation", datetime[i])
+        Ri_SW_f_diffuse = check_and_parse(data["hourly"]["diffuse_radiation"][i], "Diffuse radiation", datetime[i])
 
         push!(atms,
             Atmosphere(
                 date=datetime[i],
                 duration=duration[i],
-                T=Float64(data["hourly"]["temperature_2m"][i]),
+                T=T,
                 Wind=Wind,
-                Rh=Float64(data["hourly"]["relativehumidity_2m"][i]) / 100.0,
+                Rh=Rh,
                 P=P,
-                Precipitations=Float64(data["hourly"]["precipitation"][i]),
-                Ri_SW_f=Float64(data["hourly"]["shortwave_radiation"][i]),
-                Ri_SW_f_direct=Float64(data["hourly"]["direct_radiation"][i]),
-                Ri_SW_f_diffuse=Float64(data["hourly"]["direct_radiation"][i]),
+                Precipitations=Precip,
+                Ri_SW_f=Ri_SW_f,
+                Ri_SW_f_direct=Ri_SW_f_direct,
+                Ri_SW_f_diffuse=Ri_SW_f_diffuse,
                 # This is not so standard in meteo data, and we probably recompute it but it is useful to have it:
                 # soil_temperature_0cm=Float64(data["hourly"]["soil_temperature_0cm"][i]),
                 # soil_temperature_6cm=Float64(data["hourly"]["soil_temperature_6cm"][i]),
@@ -328,3 +339,12 @@ function format_openmeteo!(data; verbose=true)
     return atms
 end
 
+function check_and_parse(x, type, date)
+    if x === nothing
+        error(
+            "$type data is `nothing` on $date."
+        )
+    end
+
+    return Float64(x)
+end
