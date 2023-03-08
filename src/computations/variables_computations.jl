@@ -1,7 +1,13 @@
 """
-    vapor_pressure(Tₐ, Rh)
+    vapor_pressure(Tₐ, Rh, check=true)
 
 Vapor pressure (kPa) at given temperature (°C) and relative hunidity (0-1).
+
+# Arguments
+
+- `Tₐ` (Celsius degree): air temperature
+- `Rh` (0-1): relative humidity
+- `check` (Bool): if true, check that `Rh` is between 0 and 1
 
 # Examples
 
@@ -9,8 +15,8 @@ Vapor pressure (kPa) at given temperature (°C) and relative hunidity (0-1).
 vapor_pressure(25.0, 0.4)
 ```
 """
-function vapor_pressure(Tₐ, Rh)
-    Rh > 1.0 && throw(ArgumentError("Relative humidity must be between 0 and 1"))
+function vapor_pressure(Tₐ, Rh, check=true)
+    check && Rh > 1.0 && throw(ArgumentError("Relative humidity ($Rh) must be between 0 and 1"))
     Rh * e_sat(Tₐ)
 end
 
@@ -36,8 +42,8 @@ end
 
 
 """
-    air_density(Tₐ, P)
-    air_density(Tₐ, P, Rd, K₀)
+    air_density(Tₐ, P, check=true)
+    air_density(Tₐ, P, Rd, K₀, check=true)
 
 ρ, the air density (kg m-3).
 
@@ -47,6 +53,7 @@ end
 - `P` (kPa): air pressure
 - `Rd` (J kg-1 K-1): gas constant of dry air (see Foken p. 245, or R bigleaf package).
 - `K₀` (Celsius degree): temperature in Celsius degree at 0 Kelvin
+- `check` (Bool): check if P is in the 87-110 kPa earth range
 
 # Note
 
@@ -56,18 +63,19 @@ Rd and K₀ are Taken from [`Constants`](@ref) if not provided.
 
 Foken, T, 2008: Micrometeorology. Springer, Berlin, Germany.
 """
-function air_density(Tₐ, P, Rd, K₀)
+function air_density(Tₐ, P, Rd, K₀, check=true)
+    check && P <= 87.0 || P >= 110.0 && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
     (P * 1000) / (Rd * (Tₐ - K₀))
 end
 
-function air_density(Tₐ, P)
+function air_density(Tₐ, P, check=true)
     constants = Constants()
-    air_density(Tₐ, P, constants.Rd, constants.K₀)
+    air_density(Tₐ, P, constants.Rd, constants.K₀, check)
 end
 
 """
-    psychrometer_constant(P, λ, Cₚ, ε)
-    psychrometer_constant(P, λ)
+    psychrometer_constant(P, λ, Cₚ, ε, check=true)
+    psychrometer_constant(P, λ, check=true)
 
 γ, the psychrometer constant, also called psychrometric constant (kPa K−1). See Monteith and
 Unsworth (2013), p. 222.
@@ -78,6 +86,7 @@ Unsworth (2013), p. 222.
 - `λ` (``J\\ kg^{-1}``): latent heat of vaporization for water (see [`latent_heat_vaporization`](@ref))
 - `Cₚ` (J kg-1 K-1): specific heat of air at constant pressure (``J\\ K^{-1}\\ kg^{-1}``)
 - `ε` (Celsius degree): temperature in Celsius degree at 0 Kelvin
+- `check` (Bool): check if P is in the 87-110 kPa earth range
 
 # Note
 
@@ -98,13 +107,15 @@ Water Surfaces, Soil, and Vegetation ». In Principles of Environmental Physics
 edited by John L. Monteith et Mike H. Unsworth, 217‑47. Boston: Academic Press.
 
 """
-function psychrometer_constant(P, λ, Cₚ, ε)
+function psychrometer_constant(P, λ, Cₚ, ε, check=true)
+    check && P <= 87.0 || P >= 110.0 && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
     γ = (Cₚ * P) / (ε * λ)
     return γ
 end
 
-function psychrometer_constant(P, λ)
+function psychrometer_constant(P, λ, check=true)
     constant = Constants()
+    check && P <= 87.0 || P >= 110.0 && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
     γ = (constant.Cₚ * P) / (constant.ε * λ)
     return γ
 end
