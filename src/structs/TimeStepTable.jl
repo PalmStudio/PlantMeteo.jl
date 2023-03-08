@@ -135,8 +135,10 @@ end
 Get the value of a variable in a `TimeStepRow` object.
 """
 Tables.getcolumn(row::TimeStepRow, i) = row_struct(row)[i]
-# Defining the following to avoid ambiguity warnings:
+
+# Defining the following two to avoid ambiguity warnings from Tables.jl:
 Tables.getcolumn(row::TimeStepRow, nm::Symbol) = row_struct(row)[nm]
+Tables.getcolumn(row::TimeStepRow, i::Int) = row_struct(row)[i]
 
 Tables.columnnames(row::TimeStepRow) = getfield(getfield(row, :source), :names)
 
