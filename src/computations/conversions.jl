@@ -44,7 +44,6 @@ vpd(0.4,25.0)
 ```
 """
 function vpd(Rh, Tₐ)
-    Rh > 1.0 && throw(ArgumentError("Relative humidity must be between 0 and 1"))
     return vpd_from_e(vapor_pressure(Tₐ, Rh), Tₐ)
 end
 
