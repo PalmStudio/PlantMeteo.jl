@@ -54,7 +54,7 @@ function TimeStepTable{T}(ts, metadata=NamedTuple()) where {T}
 end
 
 function TimeStepTable(ts, metadata=NamedTuple())
-    TimeStepTable([ts for i in Tables.namedtupleiterator(ts)], metadata)
+    TimeStepTable([i for i in Tables.namedtupleiterator(ts)], metadata)
 end
 
 Tables.materializer(t::TimeStepTable{T}) where {T} = TimeStepTable{T}

@@ -22,6 +22,7 @@ The definition and default values are:
     vapor.
 - `Gbc_to_Gbₕ = 1.32`: conversion coefficient from boundary layer conductance to CO₂ to heat.
 - `Mₕ₂ₒ = 18.0e-3` (kg mol-1): Molar mass for water.
+- `J_to_umol = 4.57`: Conversion factor from radiation in Joules m-2 s-1 (or W m-2) to μmol m-2 s-1.
 
 # References
 
