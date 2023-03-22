@@ -139,6 +139,7 @@ function Base.show(io::IO, t::Atmosphere)
     print(io, "Atmosphere", NamedTuple(t))
 end
 
+Base.propertynames(mnt::Atmosphere) = propertynames(getfield(mnt, :nt))
 Base.getproperty(mnt::Atmosphere, s::Symbol) = getproperty(getfield(mnt, :nt), s)
 
 # This is for the Tables.jl interface:
