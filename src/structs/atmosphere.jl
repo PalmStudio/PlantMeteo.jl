@@ -86,7 +86,7 @@ function Atmosphere(;
         end
     end
 
-    if !ismissing(P) && P <= 87.0 || P >= 110.0 # ~ max and min pressure on Earth
+    if !ismissing(P) && P <= 85.0 || P >= 110.0 # ~ max and min pressure on Earth
         @warn "P ($P) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it" maxlog = 1
     end
 

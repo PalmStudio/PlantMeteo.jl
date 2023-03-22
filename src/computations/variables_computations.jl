@@ -53,7 +53,7 @@ end
 - `P` (kPa): air pressure
 - `Rd` (J kg-1 K-1): gas constant of dry air (see Foken p. 245, or R bigleaf package).
 - `K₀` (Celsius degree): temperature in Celsius degree at 0 Kelvin
-- `check` (Bool): check if P is in the 87-110 kPa earth range
+- `check` (Bool): check if P is in the 85-110 kPa earth range
 
 # Note
 
@@ -64,7 +64,7 @@ Rd and K₀ are Taken from [`Constants`](@ref) if not provided.
 Foken, T, 2008: Micrometeorology. Springer, Berlin, Germany.
 """
 function air_density(Tₐ, P, Rd, K₀; check=true)
-    check && (P <= 87.0 || P >= 110.0) && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
+    check && (P <= 85.0 || P >= 110.0) && throw(ArgumentError("Air pressure ($P) is not in the 85-110 kPa earth range"))
     (P * 1000) / (Rd * (Tₐ - K₀))
 end
 
@@ -86,7 +86,7 @@ Unsworth (2013), p. 222.
 - `λ` (``J\\ kg^{-1}``): latent heat of vaporization for water (see [`latent_heat_vaporization`](@ref))
 - `Cₚ` (J kg-1 K-1): specific heat of air at constant pressure (``J\\ K^{-1}\\ kg^{-1}``)
 - `ε` (Celsius degree): temperature in Celsius degree at 0 Kelvin
-- `check` (Bool): check if P is in the 87-110 kPa earth range
+- `check` (Bool): check if P is in the 85-110 kPa earth range
 
 # Note
 
@@ -108,14 +108,14 @@ edited by John L. Monteith et Mike H. Unsworth, 217‑47. Boston: Academic Press
 
 """
 function psychrometer_constant(P, λ, Cₚ, ε; check=true)
-    check && (P <= 87.0 || P >= 110.0) && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
+    check && (P <= 85.0 || P >= 110.0) && throw(ArgumentError("Air pressure ($P) is not in the 57-110 kPa earth range"))
     γ = (Cₚ * P) / (ε * λ)
     return γ
 end
 
 function psychrometer_constant(P, λ; check=true)
     constant = Constants()
-    check && (P <= 87.0 || P >= 110.0) && throw(ArgumentError("Air pressure ($P) is not in the 87-110 kPa earth range"))
+    check && (P <= 85.0 || P >= 110.0) && throw(ArgumentError("Air pressure ($P) is not in the 85-110 kPa earth range"))
     γ = (constant.Cₚ * P) / (constant.ε * λ)
     return γ
 end
