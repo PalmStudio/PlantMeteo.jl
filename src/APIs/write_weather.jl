@@ -104,7 +104,7 @@ end
 """
     select_weather(w, vars=setdiff(propertynames(w), ATMOSPHERE_COMPUTED))
 
-vars the variables to write in the weather data. The function returns a `DataFrame` with the selected variables.
+Select the variables to write in the weather data. The function returns a `DataFrame` with the selected variables.
 
 # Arguments
 

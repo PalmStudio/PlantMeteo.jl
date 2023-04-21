@@ -71,6 +71,8 @@ between forecast and historical data.
 [here](https://open-meteo.com/en/docs). Default to `https://api.open-meteo.com/v1/forecast`.
 - `historical_server`: the server to use for the historical data, see 
 [here](https://open-meteo.com/en/docs). Default to `https://archive-api.open-meteo.com/v1/era5`.
+- `start_archive::Dates.Day`: the first day on which we have to get data from the historical archive instead of the forecast server, 
+data is at 25km resolution in the archive. Default to -173 days.
 - `units::OpenMeteoUnits`: the units used for the variables, see [`OpenMeteoUnits`](@ref).
 - `timezone`: the timezone used for the data, see [the list here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). 
 Default to "UTC". This parameter is not checked, so be careful when using it.
@@ -100,6 +102,7 @@ struct OpenMeteo <: AbstractAPI
     vars::Vector{String}
     forecast_server::String
     historical_server::String
+    start_archive::Dates.Day
     units::OpenMeteoUnits
     timezone::String
     models::Vector{String}
@@ -131,6 +134,7 @@ function OpenMeteo(;
     vars=DEFAULT_OPENMETEO_HOURLY,
     forecast_server="https://api.open-meteo.com/v1/forecast",
     historical_server="https://archive-api.open-meteo.com/v1/era5",
+    start_archive=-Dates.Day(176),
     units=OpenMeteoUnits(),
     timezone="UTC",
     models=["best_match"]
@@ -147,7 +151,7 @@ function OpenMeteo(;
         @assert i in OPENMETEO_MODELS "The model $i is not available. See OPENMETEO_MODELS for more details."
     end
 
-    OpenMeteo(vars, forecast_server, historical_server, units, timezone, models)
+    OpenMeteo(vars, forecast_server, historical_server, start_archive, units, timezone, models)
 end
 
 """
@@ -161,6 +165,7 @@ A function that returns the weather forecast from OpenMeteo.com
 - `lon`: Longitude of the location
 - `period::Union{StepRange{Date, Day}, Vector{Dates.Date}}`: Period of the forecast
 - `verbose`: If `true`, print more information in case of errors or warnings.
+- `kwargs`: Additional keyword arguments passed to [`get_forecast`](@ref) (not used in this method).
 
 # Examples
 
@@ -173,7 +178,7 @@ params = OpenMeteo()
 get_forecast(params, lat, lon, period)
 ```
 """
-function get_forecast(params::OpenMeteo, lat, lon, period; verbose=true)
+function get_forecast(params::OpenMeteo, lat, lon, period; verbose=true, kwargs...)
 
     period[1] > period[end] && error("start date must be before end date")
 
@@ -189,14 +194,12 @@ function get_forecast(params::OpenMeteo, lat, lon, period; verbose=true)
         )
     end
 
-    # The ~1km scale forecast API history does not go beyond 196 days 
-    # before today:
-    start_archive = -Dates.Day(173)
-    archive_date = Dates.today() + Dates.Day(start_archive) - Dates.Day(1)
+    # The ~1km scale forecast API history does not go beyond ~170 days before today (and it can change...)
+    archive_date = Dates.today() + Dates.Day(params.start_archive) - Dates.Day(1)
     atms_archive = Atmosphere[]
 
     if period[1] <= archive_date
-        verbose && @info """Open-Meteo.com "forecast" data does not go beyond -173 days ($archive_date).
+        verbose && @info """Open-Meteo.com "forecast" data does not go beyond $(params.start_archive) ($archive_date).
         Fetching Era5 data for previous dates (0.25° resolution, ~25-30km).        
         """
 

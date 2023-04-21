@@ -6,9 +6,8 @@ You can get all available APIs using `subtype(AbstractAPI)`.
 """
 abstract type AbstractAPI end
 
-
 """
-    get_weather(lat, lon, period::Union{StepRange{Date, Day}, Vector{Dates.Date}}; api::DataType=OpenMeteo, sink=TimeStepTable)
+    get_weather(lat, lon, period::Union{StepRange{Date, Day}, Vector{Dates.Date}}; api::DataType=OpenMeteo, sink=TimeStepTable, kwargs...)
 
 Returns the weather forecast for a given location and time using a weather API.
 
@@ -20,6 +19,7 @@ Returns the weather forecast for a given location and time using a weather API.
 - `api::DataType=OpenMeteo`: API to use for the forecast.
 - `sink::DataType=TimeStepTable`: Type of the output. Default is `TimeStepTable`, but it
 can be any type that implements the `Tables.jl` interface, such as `DataFrames`.
+- `kwargs...`: Additional keyword arguments that are passed to the API
 
 # Details
 
@@ -36,13 +36,13 @@ period = [today(), today()+Dates.Day(1)]
 w = get_weather(48.8566, 2.3522, period)
 ```
 """
-function get_weather(lat, lon, period::P; api::AbstractAPI=OpenMeteo(), sink=TimeStepTable) where {P<:Union{StepRange{Dates.Date,Dates.Day},Vector{Dates.Date}}}
+function get_weather(lat, lon, period::P; api::AbstractAPI=OpenMeteo(), sink=TimeStepTable, kwargs...) where {P<:Union{StepRange{Dates.Date,Dates.Day},Vector{Dates.Date}}}
 
     @assert lat >= -90 && lat <= 90 "Latitude must be between -90 and 90"
     @assert lon >= -180 && lon <= 180 "Longitude must be between -180 and 180"
 
     # Get the weather forecast from the API:
-    tst = get_forecast(api, lat, lon, period)
+    tst = get_forecast(api, lat, lon, period; kwargs...)
 
     # Use the sink:
     if sink == TimeStepTable
