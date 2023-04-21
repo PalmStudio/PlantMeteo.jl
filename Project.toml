@@ -1,7 +1,7 @@
 name = "PlantMeteo"
 uuid = "4630fe09-e0fb-4da5-a846-781cb73437b6"
 authors = ["remi.vezy <VEZY@users.noreply.github.com> and contributors"]
-version = "0.3.2"
+version = "0.4.0"
 
 [deps]
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
