@@ -21,6 +21,10 @@ using Documenter # for doctests
         include("test-write_weather.jl")
     end
 
+    @testset "TimeStepRow" begin
+        include("test-TimeStepRow.jl")
+    end
+
     @testset "TimeStepTable" begin
         include("test-TimeStepTable.jl")
     end

@@ -7,7 +7,7 @@ import Statistics
 import Tables
 import Term # for pretty printing the TimeStepTable
 import HTTP, JSON # for the open-meteo API
-import DataAPI, DataAPI.metadata, DataAPI.metadatakeys
+import DataAPI, DataAPI.metadata, DataAPI.metadatakeys, DataAPI.nrow, DataAPI.ncol
 
 include("structs/defaults.jl")
 include("structs/constants.jl")
@@ -29,6 +29,7 @@ include("APIs/write_weather.jl")
 
 export Atmosphere, TimeStepTable, Constants, Weather
 export get_index_raw
+export nrow, ncol
 export atmosphere_emissivity, vapor_pressure
 export e_sat, air_density, latent_heat_vaporization
 export psychrometer_constant

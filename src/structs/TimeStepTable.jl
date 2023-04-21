@@ -78,11 +78,34 @@ end
 
 
 # TimeStepRow definition (efficient view-like access to a row in a TimeStepTable):
-
 struct TimeStepRow{T} <: Tables.AbstractRow
     row::Int
     source::TimeStepTable{T}
 end
+
+Base.parent(ts::TimeStepRow) = getfield(ts, :source)
+rownumber(ts::TimeStepRow) = getfield(ts, :row)
+
+# Defining the generic implementation of row_from_parent:
+row_from_parent(row, i) = Tables.rows(parent(row))[i]
+
+# And the more optimized version for TimeStepRow:
+row_from_parent(row::TimeStepRow, i) = parent(row)[i]
+
+"""
+    next_row(row::TimeStepRow, i=1)
+
+Return the next row in the table.
+"""
+next_row(row, i=1) = row_from_parent(row, rownumber(row) + i)
+
+"""
+    prev_row(row::TimeStepRow, i=1)
+
+Return the previous row in the table.
+"""
+prev_row(row, i=1) = row_from_parent(row, rownumber(row) - i)
+
 
 ###### Tables.jl interface ######
 
@@ -111,12 +134,15 @@ function Base.length(A::TimeStepTable{T}) where {T}
     length(getfield(A, :ts))
 end
 
+nrow(ts::T) where {T<:TimeStepTable} = length(ts) # uses DataAPI.jl interface
+ncol(ts::T) where {T<:TimeStepTable} = length(getfield(ts, :names))  # uses DataAPI.jl interface
+
 Tables.columnnames(ts::TimeStepTable) = getfield(ts, :names)
 
 # Iterate over all time-steps in a TimeStepTable object.
 # Base.iterate(st::TimeStepTable{T}, i=1) where {T} = i > length(st) ? nothing : (getfield(st, :ts)[i], i + 1)
 Base.iterate(t::TimeStepTable{T}, st=1) where {T} = st > length(t) ? nothing : (TimeStepRow(st, t), st + 1)
-Base.size(t::TimeStepTable{T}, dim=1) where {T} = dim == 1 ? length(t) : length(getfield(t, :names))
+Base.size(t::TimeStepTable{T}, dim=1) where {T} = dim == 1 ? nrow(t) : ncol(t)
 
 """
     row_struct(ts::TimeStepRow)
@@ -125,7 +151,7 @@ Get `TimeStepRow` in its raw format, *e.g.* the `NamedTuple` that stores the val
 or the `Atmosphere` of values (or `Status` for `PlantSimEngine.jl`).
 """
 function row_struct(row::TimeStepRow)
-    getfield(getfield(row, :source), :ts)[getfield(row, :row)]
+    getfield(parent(row), :ts)[rownumber(row)]
 end
 
 """
@@ -140,7 +166,7 @@ Tables.getcolumn(row::TimeStepRow, i) = row_struct(row)[i]
 Tables.getcolumn(row::TimeStepRow, nm::Symbol) = row_struct(row)[nm]
 Tables.getcolumn(row::TimeStepRow, i::Int) = row_struct(row)[i]
 
-Tables.columnnames(row::TimeStepRow) = getfield(getfield(row, :source), :names)
+Tables.columnnames(row::TimeStepRow) = getfield(parent(row), :names)
 
 """
     setindex!(row::TimeStepRow, nm::Symbol)
@@ -328,8 +354,8 @@ end
 
 function Base.show(io::IO, row::TimeStepRow)
     limit = get(io, :limit, true)
-    i = getfield(row, :row)
-    st = getfield(getfield(row, :source), :ts)[i]
+    i = rownumber(row)
+    st = getfield(parent(row), :ts)[i]
     ts_print = "Step $i: " * show_long_format_row(st, limit)
 
     st_panel = Term.Panel(
