@@ -133,15 +133,15 @@ function compute_date(
     hour_format=Dates.DateFormat("HH:MM:SS"),
 )
 
-    if hasproperty(data, :date) && typeof(data.date[1]) != Dates.DateTime
-        # There's a "date" column but it is not a DateTime
+    if hasproperty(data, :date) && !(typeof(data.date[1]) == Dates.DateTime || typeof(data.date[1]) == Dates.Date)
+        # There's a "date" column but it is not a DateTime or a Date
         # Trying to parse it with the user-defined format:
         date = try
             Dates.Date.(data.date, date_format)
         catch e
             error(
                 "The values in the `date` column cannot be parsed.",
-                " Please check the format of the dates or provide the format as argument.",
+                " Please check the format of the dates or provide the format as argument.\n",
                 e
             )
         end
