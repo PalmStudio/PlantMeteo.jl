@@ -22,9 +22,8 @@ The default transformations are:
 - `:Rh => mean => :Rh`: the relative humidity is averaged
 - `:Wind, :P, :Rh, :Cₐ, :e, :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ, :clearness` are 
 all averaged
-- `:Ri_SW_f => mean => :Ri_SW_f`: the irradiance is averaged (W m-2)
-- `[:Ri_SW_f, :duration] => ((x, y) -> sum(x .* Dates.toms.(y)) * 1.0e-9) => :Ri_SW_q`: the irradiance is also summed (MJ m-2 d-1)
-- All other irradiance variables are also averaged or integrated (see the code for details)
+- `[:Ri_SW_f, :duration] => ((x, y) -> sum(x .* Dates.toms.(y)) * 1.0e-9) => :Ri_SW_f`: the irradiance is integrated, so its unit chaneges from W m⁻² to MJ m⁻² d⁻¹
+- All other irradiance variables are also integrated (see the code for details)
 
 Note that the default transformations can be overriden by the user, and that the
 default transformations are only applied if the variable is available.
@@ -124,10 +123,8 @@ The default transformations are:
 - `:Rh => mean => :Rh`: the relative humidity is averaged
 - `:Wind, :P, :Rh, :Cₐ, :e, :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ, :clearness` are 
 all averaged
-- `:Ri_SW_f => mean => :Ri_SW_f`: the irradiance is averaged (W m-2)
-- `[:Ri_SW_f, :duration] => ((x, y) -> sum(x .* Dates.toms.(y)) * 1.0e-9) => :Ri_SW_q`: the irradiance is also summed (MJ m-2 d-1)
-- All other irradiance variables are also averaged or integrated (see the code for details)
-
+- `[:Ri_SW_f, :duration] => ((x, y) -> sum(x .* Dates.toms.(y)) * 1.0e-9) => :Ri_SW_f`: the irradiance is integrated, so its unit chaneges from W m⁻² to MJ m⁻² d⁻¹
+- All other irradiance variables are also integrated (see the code for details)
 """
 function default_transformation(df)
     trans = Pair[]
@@ -144,20 +141,19 @@ function default_transformation(df)
 
     # Compute the average of the following variables:
     to_average = (
-        :Wind, :P, :Rh, :Cₐ, :e, :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ, :clearness,
-        :Ri_SW_f, :Ri_PAR_f, :Ri_NIR_f, :Ri_TIR_f, :Ri_custom_f
+        :Wind, :P, :Rh, :Cₐ, :e, :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ, :clearness
     )
     # Note: e.g. Ri_SW_f is the average radiation in W/m²
 
     add_transformations!(df, trans, to_average, Statistics.mean; error_missing=false)
 
-    # NOte: e.g. Ri_SW_q is the radiation in MJ/m²/day:
+    # Note: e.g. Ri_SW_f becomes the radiation in MJ/m²/day (instead of W/m²):
     to_transform = (
-        [:Ri_SW_f, :duration] => :Ri_SW_q,
-        [:Ri_PAR_f, :duration] => :Ri_PAR_q,
-        [:Ri_NIR_f, :duration] => :Ri_NIR_q,
-        [:Ri_TIR_f, :duration] => :Ri_TIR_q,
-        [:Ri_custom_f, :duration] => :Ri_custom_q,
+        [:Ri_SW_f, :duration] => :Ri_SW_f,
+        [:Ri_PAR_f, :duration] => :Ri_PAR_f,
+        [:Ri_NIR_f, :duration] => :Ri_NIR_f,
+        [:Ri_TIR_f, :duration] => :Ri_TIR_f,
+        [:Ri_custom_f, :duration] => :Ri_custom_f,
     )
 
     add_transformations!(
