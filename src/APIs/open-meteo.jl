@@ -72,11 +72,16 @@ between forecast and historical data.
 - `historical_server`: the server to use for the historical data, see 
 [here](https://open-meteo.com/en/docs). Default to `https://archive-api.open-meteo.com/v1/era5`.
 - `start_archive::Dates.Day`: the first day on which we have to get data from the historical archive instead of the forecast server, 
-data is at 25km resolution in the archive. Default to -173 days.
+data is at 25km resolution in the archive. Default to -150 days.
 - `units::OpenMeteoUnits`: the units used for the variables, see [`OpenMeteoUnits`](@ref).
 - `timezone`: the timezone used for the data, see [the list here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). 
 Default to "UTC". This parameter is not checked, so be careful when using it.
 - `models`: the models to use for the forecast. Default to `"["best_match"]"`. See [`OPENMETEO_MODELS`](@ref) for more details.
+
+# Troubleshooting
+
+If you get an error when calling the API, try to decrease the value of `start_archive` to *e.g.*. 100 days before 
+today (`-Dates.Day(100)`).
 
 # Details
 
@@ -134,7 +139,7 @@ function OpenMeteo(;
     vars=DEFAULT_OPENMETEO_HOURLY,
     forecast_server="https://api.open-meteo.com/v1/forecast",
     historical_server="https://archive-api.open-meteo.com/v1/era5",
-    start_archive=-Dates.Day(176),
+    start_archive=-Dates.Day(150),
     units=OpenMeteoUnits(),
     timezone="UTC",
     models=["best_match"]
@@ -273,7 +278,7 @@ end
 Format the JSON file returned by the Open-Meteo API into a vector 
 of [`Atmosphere`](@ref). The function also updates some units in `data`.
 """
-function format_openmeteo!(data; verbose=true)
+function format_openmeteo!(data; constant=Constants(), verbose=true)
     atms = Atmosphere[]
     datetime = [Dates.DateTime(i, Dates.dateformat"yyyy-mm-ddTHH:MM") for i in data["hourly"]["time"]]
 
@@ -322,6 +327,8 @@ function format_openmeteo!(data; verbose=true)
                 Ri_SW_f=Ri_SW_f,
                 Ri_SW_f_direct=Ri_SW_f_direct,
                 Ri_SW_f_diffuse=Ri_SW_f_diffuse,
+                Ri_PAR_f=Ri_SW_f * constant.PAR_fraction,
+                Ri_NIR_f=Ri_SW_f * (1.0 - constant.PAR_fraction),
                 # This is not so standard in meteo data, and we probably recompute it but it is useful to have it:
                 # soil_temperature_0cm=Float64(data["hourly"]["soil_temperature_0cm"][i]),
                 # soil_temperature_6cm=Float64(data["hourly"]["soil_temperature_6cm"][i]),
