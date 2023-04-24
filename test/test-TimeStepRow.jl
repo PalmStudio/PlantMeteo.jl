@@ -19,9 +19,12 @@
     @test PlantMeteo.row_from_parent(row1, 2) == row2
     @test PlantMeteo.next_row(row1) == row2
     @test PlantMeteo.prev_row(row2) == row1
-
     @test_throws BoundsError PlantMeteo.next_row(row2)
     @test_throws BoundsError PlantMeteo.prev_row(row1)
+
+    @test PlantMeteo.next_value(row1, :T) == row2.T
+    @test PlantMeteo.next_value(row1, :Wind) == row2.Wind
+    @test PlantMeteo.prev_value(row2, :T) == row1.T
 
     @test PlantMeteo.row_struct(row1) == vars1
     @test PlantMeteo.row_struct(row2) == vars2

@@ -103,15 +103,48 @@ end
 
 Return the next row in the table.
 """
-next_row(row, i=1) = row_from_parent(row, rownumber(row) + i)
+@inline function next_row(row, i=1)
+    @boundscheck if rownumber(row) + i > lastindex(parent(row))
+        throw(BoundsError(parent(row), rownumber(row) + i))
+    end
+    return row_from_parent(row, rownumber(row) + i)
+end
+
+"""
+    next_value(row::TimeStepRow, var, next_index=1; default=nothing)
+
+Return the value of `var` in the next row in the table, or `default` if there is no next row.
+"""
+@inline function next_value(row, var, next_index=1; default=nothing)
+    @boundscheck if rownumber(row) + next_index > lastindex(parent(row))
+        return default
+    end
+    return @inbounds next_row(row, next_index)[var]
+end
 
 """
     prev_row(row::TimeStepRow, i=1)
 
-Return the previous row in the table.
+Return the previous row in the table, or `default` if there is no previous row.
 """
-prev_row(row, i=1) = row_from_parent(row, rownumber(row) - i)
+@inline function prev_row(row, i=1)
+    @boundscheck if rownumber(row) - i < firstindex(parent(row))
+        throw(BoundsError(parent(row), rownumber(row) + i))
+    end
+    return row_from_parent(row, rownumber(row) - i)
+end
 
+"""
+    prev_value(row::TimeStepRow, var, prev_index=1; default=nothing)
+
+Return the value of `var` in the previous row in the table, or `default` if there is no previous row.
+"""
+@inline function prev_value(row, var, prev_index=1; default=nothing)
+    @boundscheck if rownumber(row) - prev_index < firstindex(parent(row))
+        return default
+    end
+    return @inbounds prev_row(row, prev_index)[var]
+end
 
 ###### Tables.jl interface ######
 
