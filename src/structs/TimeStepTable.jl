@@ -93,6 +93,11 @@ row_from_parent(row, i) = Tables.rows(parent(row))[i]
 # And the more optimized version for TimeStepRow:
 row_from_parent(row::TimeStepRow, i) = parent(row)[i]
 
+function Base.getindex(row::TimeStepRow{T}, i::Int) where {T<:AbstractDict}
+    ts = parent(row)
+    getindex(ts[rownumber(row)], names(ts)[i])
+end
+
 """
     next_row(row::TimeStepRow, i=1)
 
@@ -192,7 +197,7 @@ function Base.getproperty(ts::TimeStepTable, key::Symbol)
 end
 
 function Base.propertynames(ts::TimeStepTable)
-    keys(Tables.columns(ts))
+    getfield(ts, :names)
 end
 
 Base.names(ts::TimeStepTable) = propertynames(ts)
