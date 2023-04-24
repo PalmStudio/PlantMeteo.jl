@@ -14,7 +14,7 @@
     @test w_day.Tmin[1] == minimum(w.T[1:24])
     @test w_day.Tmax[1] == maximum(w.T[1:24])
     @test w_day.Tmin[2] == minimum(w.T[25:48])
-    @test w_day.T[2] == mean(w.T[25:48])
+    @test w_day.T[2] ≈ mean(w.T[25:48])
 
     # Testing radiation:
     @test hasproperty(w_day, :Ri_SW_f)
