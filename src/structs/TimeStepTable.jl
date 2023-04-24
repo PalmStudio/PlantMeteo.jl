@@ -42,6 +42,7 @@ struct TimeStepTable{T}
 end
 
 TimeStepTable(ts::V, metadata=NamedTuple()) where {V<:Vector} = TimeStepTable(keys(ts[1]), metadata, ts)
+TimeStepTable(ts::V, metadata=NamedTuple()) where {V<:Vector{<:AbstractDict}} = TimeStepTable((keys(ts[1])...,), metadata, ts)
 
 # If the metadata is a Dict, we convert it to a NamedTuple
 function TimeStepTable(ts::V, metadata::D) where {V<:Vector,D<:Dict}
@@ -117,7 +118,7 @@ names(ts::TimeStepTable) = keys(ts)
 # matrix(ts::TimeStepTable) = reduce(hcat, [[i...] for i in ts])'
 
 function Tables.schema(m::TimeStepTable)
-    Tables.Schema(names(m), DataType[i.types[1] for i in T.parameters[2]])
+    Tables.Schema([names(m)...], [typeof(i) for i in values(PlantMeteo.row_struct(m[1]))])
 end
 
 Tables.materializer(::Type{TimeStepTable}) = TimeStepTable
@@ -286,68 +287,16 @@ function Base.show(io::IO, t::TimeStepTable{T}) where {T}
         "TimeStepTable{$(T_string)}($(length(t)) x $(length(getfield(t,:names)))):\n"
     )
 
-    #! Note: There should be a better way to add the TimeStep as the first column. 
-    # Here we transform the whole table into a matrix and pass the header manually... 
-    # Also we manually replace last columns or rows by ellipsis if the table is too long or too wide.
-
-    t_mat = Tables.matrix(t)
-    col_names = [:Step, getfield(t, :names)...]
-    ts_column = string.(1:size(t_mat, 1)) # TimeStep index column
-
-    if get(io, :compact, false) || get(io, :limit, true)
-        # We need the values in the matrix to be Strings to perform the truncation (and it is done afterwards too so...)
-        typeof(t_mat) <: Matrix{String} || (t_mat = string.(t_mat))
-
-        disp_size = displaysize(io)
-        if size(t_mat, 1) * Term.Measures.height(t_mat[1, 1]) >= disp_size[1]
-            t_mat = vcat(t_mat[1:disp_size[1], :], fill("...", (1, size(t_mat, 2))))
-            # We need to add the TimeStep as the first column:
-            ts_column = ts_column[1:disp_size[1]+1]
-            ts_column[end] = "..."
-        end
-
-        # Header size (usually the widest):
-        space_around_text = 8
-        header_size = textwidth(join(col_names, join(fill(" ", space_around_text))))
-        # Maximum column size:
-        colsize = findmax(first, textwidth(join(t_mat[i, :], join(fill(" ", space_around_text)))) for i in axes(t_mat, 1))
-
-        # Find the column that goes beyond the display:
-        if header_size >= colsize[1]
-            # The header is wider
-            max_col_index = findfirst(x -> x > disp_size[2], cumsum(textwidth.(string.(col_names)) .+ space_around_text))
-        else
-            # One of the columns is wider
-            max_col_index = findfirst(x -> x > disp_size[2], cumsum(textwidth.(t_mat[colsize[2], :]) .+ space_around_text))
-        end
-
-        if max_col_index !== nothing
-            # We found a column that goes beyond the display, so we need to truncate starting from this one (also counting the extra ...)
-            t_mat = t_mat[:, 1:max_col_index-2]
-            # And we add an ellipsis to the last column for clarity:
-            t_mat = hcat(t_mat, repeat(["..."], size(t_mat, 1)))
-            # Add the ellipsis to the column names:
-            col_names = [col_names[1:max_col_index-1]..., Symbol("...")]
-            # remember that the first column is the TimeStep so we don't use max_col_index-2 here
-        end
-    end
-
-    t_mat = Tables.table(hcat(ts_column, t_mat), header=col_names)
-
-    st_panel = Term.Tables.Table(
-        t_mat;
-        box=:ROUNDED, style="red", compact=false
+    PrettyTables.pretty_table(
+        io, t,
+        tf=PrettyTables.tf_unicode_rounded,
+        border_crayon=Crayons.crayon"red",
+        show_row_number=true,
+        row_label_column_title="Step"
     )
-    print(io, st_panel)
 
     if length(metadata(t)) > 0
-        print(
-            io,
-            Term.RenderableText(
-                "Metadata: `$(metadata(t))`";
-                style="bold"
-            )
-        )
+        print(io, "Metadata: `$(metadata(t))`")
     end
 end
 
@@ -355,8 +304,7 @@ end
 function Base.show(io::IO, row::TimeStepRow)
     limit = get(io, :limit, true)
     i = rownumber(row)
-    st = getfield(parent(row), :ts)[i]
-    ts_print = "Step $i: " * show_long_format_row(st, limit)
+    ts_print = "Step $i: " * show_long_format_row(row, limit)
 
     st_panel = Term.Panel(
         ts_print,

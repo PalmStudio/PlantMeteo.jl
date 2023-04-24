@@ -5,7 +5,7 @@ import YAML, CSV
 import DataFrames
 import Statistics
 import Tables
-import Term # for pretty printing the TimeStepTable
+import Term, Crayons, PrettyTables # for pretty printing the TimeStepTable
 import HTTP, JSON # for the open-meteo API
 import DataAPI, DataAPI.metadata, DataAPI.metadatakeys, DataAPI.nrow, DataAPI.ncol
 
