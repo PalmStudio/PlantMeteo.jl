@@ -353,3 +353,9 @@ function Base.show(io::IO, row::TimeStepRow)
 
     print(io, Term.highlight(st_panel))
 end
+
+
+function Base.:(==)(ts1::TimeStepTable{T}, ts2::TimeStepTable{T}) where {T}  
+    return (getfield(ts1,:names) == getfield(ts2,:names)) && 
+    (getfield(ts1,:metadata) == getfield(ts2, :metadata)) && (getfield(ts1,:ts) == getfield(ts2,:ts))
+end
