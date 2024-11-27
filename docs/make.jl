@@ -7,11 +7,12 @@ DocMeta.setdocmeta!(PlantMeteo, :DocTestSetup, :(using PlantMeteo, Dates); recur
 makedocs(;
     modules=[PlantMeteo],
     authors="remi.vezy <VEZY@users.noreply.github.com> and contributors",
-    repo="https://github.com/PalmStudio/PlantMeteo.jl/blob/{commit}{path}#{line}",
+    repo=Documenter.Remotes.GitHub("PalmStudio", "PlantMeteo.jl"),
     sitename="PlantMeteo.jl",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
         canonical="https://PalmStudio.github.io/PlantMeteo.jl",
+        edit_link="main",
         assets=String[]
     ),
     pages=[
@@ -21,6 +22,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="github.com/PalmStudio/PlantMeteo.jl",
+    repo="github.com/PalmStudio/PlantMeteo.jl.git",
     devbranch="main"
 )
