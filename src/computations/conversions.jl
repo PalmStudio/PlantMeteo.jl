@@ -31,7 +31,7 @@ function rh_from_e(e, Tₐ)
 end
 
 """
-    vpd(Rh,eₛ)
+    vpd(Rh,Tₐ)
 
 Compute vapor pressure deficit (kPa) from the air relative humidity (0-1) and temperature (°C).
 
