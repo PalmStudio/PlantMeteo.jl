@@ -22,7 +22,7 @@ The default transformations are:
 - `:Rh => mean => :Rh`: the relative humidity is averaged
 - `:Wind, :P, :Rh, :Cₐ, :e, :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ, :clearness` are 
 all averaged
-- `[:Ri_SW_f, :duration] => ((x, y) -> sum(x .* Dates.toms.(y)) * 1.0e-9) => :Ri_SW_f`: the irradiance is integrated, so its unit chaneges from W m⁻² to MJ m⁻² d⁻¹
+- `[:Ri_SW_f, :duration] => ((x, y) -> sum(x .* Dates.toms.(y)) * 1.0e-9) => :Ri_SW_f`: the irradiance is integrated, so its unit changes from W m⁻² to MJ m⁻² d⁻¹
 - All other irradiance variables are also integrated (see the code for details)
 
 Note that the default transformations can be overriden by the user, and that the
@@ -123,7 +123,7 @@ The default transformations are:
 - `:Rh => mean => :Rh`: the relative humidity is averaged
 - `:Wind, :P, :Rh, :Cₐ, :e, :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ, :clearness` are 
 all averaged
-- `[:Ri_SW_f, :duration] => ((x, y) -> sum(x .* Dates.toms.(y)) * 1.0e-9) => :Ri_SW_f`: the irradiance is integrated, so its unit chaneges from W m⁻² to MJ m⁻² d⁻¹
+- `[:Ri_SW_f, :duration] => ((x, y) -> sum(x .* Dates.toms.(y)) * 1.0e-9) => :Ri_SW_f`: the irradiance is integrated, so its unit changes from W m⁻² to MJ m⁻² d⁻¹
 - All other irradiance variables are also integrated (see the code for details)
 """
 function default_transformation(df)
