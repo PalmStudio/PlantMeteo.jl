@@ -170,7 +170,6 @@ MeteoTransform(target::Symbol; source::Symbol=target, reducer=MeanWeighted()) = 
 
 """
     PreparedWeather(weather; transforms=default_sampling_transforms(), lazy=true)
-    prepare_weather_sampler(weather; transforms=default_sampling_transforms(), lazy=true)
 
 Container holding a fine-step weather table and lazy sampling cache.
 """
@@ -193,6 +192,11 @@ function PreparedWeather(weather; transforms=default_sampling_transforms(), lazy
     )
 end
 
+"""
+    prepare_weather_sampler(weather; transforms=default_sampling_transforms(), lazy=true)
+
+Build the [`PreparedWeather`](@ref) container holding a fine-step weather table and lazy sampling cache.
+"""
 prepare_weather_sampler(weather; transforms=default_sampling_transforms(), lazy::Bool=true) =
     PreparedWeather(weather; transforms=transforms, lazy=lazy)
 
@@ -439,6 +443,21 @@ function _normalize_single_transform(target::Symbol, rule)
     return MeteoTransform(target; source=target, reducer=_normalize_reducer(rule))
 end
 
+"""
+    normalize_sampling_transforms(transforms)
+
+Normalize user-provided weather transform definitions into `Vector{MeteoTransform}`.
+
+Accepted inputs are:
+- `Vector{MeteoTransform}` (copied as-is)
+- `NamedTuple` where each key is the target variable and each value is either:
+  - a reducer (`AbstractTimeReducer` instance/type, or callable), or
+  - a named tuple with optional `source` and `reducer` fields
+- `AbstractVector` containing only `MeteoTransform` entries
+
+This is the canonical parser used by [`PreparedWeather`](@ref) and
+[`sample_weather`](@ref) to validate and materialize transform rules.
+"""
 function normalize_sampling_transforms(transforms::AbstractVector{MeteoTransform})
     return collect(transforms)
 end
