@@ -45,6 +45,10 @@ using Documenter # for doctests
         include("test-to_daily.jl")
     end
 
+    @testset "weather sampling" begin
+        include("test-weather_sampling.jl")
+    end
+
     @testset "Doctests" begin
         DocMeta.setdocmeta!(PlantMeteo, :DocTestSetup, :(using PlantMeteo, Dates); recursive=true)
 

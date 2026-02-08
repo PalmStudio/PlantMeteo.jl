@@ -148,7 +148,7 @@ end
 
 ###### Tables.jl interface ######
 
-Tables.istable(::Type{TimeStepTable}) = true
+Tables.istable(::Type{TimeStepTable{T}}) where {T} = true
 
 # Keys should be the same between TimeStepTable so we only need the ones from the first timestep
 Base.keys(ts::TimeStepTable) = getfield(ts, :names)

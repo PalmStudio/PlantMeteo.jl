@@ -24,8 +24,8 @@ include("APIs/open-meteo.jl")
 include("computations/conversions.jl")
 include("checks/check_day_complete.jl")
 include("computations/to_daily.jl")
+include("computations/weather_sampling.jl")
 include("APIs/write_weather.jl")
-# include("computations/weather_sampling.jl")
 
 export Atmosphere, TimeStepTable, Constants, Weather
 export get_index_raw
@@ -40,5 +40,10 @@ export get_forecast
 export OpenMeteo, OpenMeteoUnits
 export get_weather
 export to_daily
+export AbstractTimeReducer
+export MeanWeighted, MeanReducer, SumReducer, MinReducer, MaxReducer, FirstReducer, LastReducer, RadiationEnergy
+export MeteoSamplingSpec, MeteoTransform
+export PreparedWeather, prepare_weather_sampler, sample_weather, materialize_weather
+export default_sampling_transforms, normalize_sampling_transforms
 
 end
