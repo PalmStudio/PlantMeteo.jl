@@ -158,7 +158,7 @@ MeteoSamplingSpec(dt::Real; window::AbstractSamplingWindow=RollingWindow()) = Me
 """
     MeteoTransform(target; source=target, reducer=MeanWeighted())
 
-One weather transformation rule used by [`sample_weather`](@ref).
+One weather transformation rule used by [`PlantMeteo.sample_weather`](@ref).
 """
 struct MeteoTransform{R}
     target::Symbol
@@ -532,6 +532,29 @@ function _sample_weather_uncached(
     return Atmosphere(; check=false, kwargs...)
 end
 
+"""
+    sample_weather(prepared, step; spec=MeteoSamplingSpec(1.0, 0.0), transforms=nothing)
+
+Sample one aggregated weather row at `step` from a [`PreparedWeather`](@ref) sampler.
+
+# Arguments
+
+- `prepared::PreparedWeather`: output of [`prepare_weather_sampler`](@ref), holding source weather and optional cache.
+- `step::Int`: 1-based index in the original fine-step weather table.
+
+# Keyword arguments
+
+- `spec::MeteoSamplingSpec`: window definition and phase used to select rows before reduction.
+  The default `MeteoSamplingSpec(1.0, 0.0)` behaves as an identity window.
+- `transforms`: optional transform override for this call.
+  If `nothing`, uses `prepared.transforms`; otherwise accepted by
+  [`normalize_sampling_transforms`](@ref) (e.g. `NamedTuple` or `Vector{MeteoTransform}`).
+
+# Returns
+
+An `Atmosphere` instance built from reduced variables over the selected window.
+When `prepared.lazy == true`, results are memoized by `(step, spec, transforms)` and reused on repeated calls.
+"""
 function sample_weather(
     prepared::PreparedWeather,
     step::Int;
