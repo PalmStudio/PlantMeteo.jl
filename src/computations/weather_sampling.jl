@@ -96,17 +96,64 @@ function (::RadiationEnergy)(vals::AbstractVector{<:Real})
 end
 
 """
-    MeteoSamplingSpec(dt, phase=0.0)
+    RollingWindow()
+    CalendarWindow(period, anchor=:current_period, week_start=1, completeness=:allow_partial)
+
+Window selection for weather sampling.
+`RollingWindow` uses a trailing rolling window driven by `dt`.
+`CalendarWindow` groups rows by civil period (`:day`, `:week`, `:month`).
+"""
+abstract type AbstractSamplingWindow end
+
+struct RollingWindow <: AbstractSamplingWindow end
+
+struct CalendarWindow <: AbstractSamplingWindow
+    period::Symbol
+    anchor::Symbol
+    week_start::Int
+    completeness::Symbol
+end
+
+function CalendarWindow(
+    period::Symbol;
+    anchor::Symbol=:current_period,
+    week_start::Int=1,
+    completeness::Symbol=:allow_partial
+)
+    period in (:day, :week, :month) || error(
+        "Unsupported calendar period `$(period)`. Allowed values are :day, :week, :month."
+    )
+    anchor in (:current_period, :previous_complete_period) || error(
+        "Unsupported calendar anchor `$(anchor)`. Allowed values are :current_period, :previous_complete_period."
+    )
+    1 <= week_start <= 7 || error(
+        "Invalid `week_start=$(week_start)`. Allowed values are integers in 1:7 (1=Monday, 7=Sunday)."
+    )
+    completeness in (:allow_partial, :strict) || error(
+        "Unsupported completeness mode `$(completeness)`. Allowed values are :allow_partial, :strict."
+    )
+    return CalendarWindow(period, anchor, Int(week_start), completeness)
+end
+
+"""
+    MeteoSamplingSpec(dt, phase=0.0; window=RollingWindow())
 
 Sampling specification used to aggregate fine-step weather into a model clock window.
 `dt` and `phase` are expressed in base weather timesteps.
+`window` selects how weather rows are selected before reducers are applied.
 """
-struct MeteoSamplingSpec{T<:Real}
+struct MeteoSamplingSpec{T<:Real,W<:AbstractSamplingWindow}
     dt::T
     phase::T
+    window::W
 end
 
-MeteoSamplingSpec(dt::T) where {T<:Real} = MeteoSamplingSpec{T}(dt, zero(T))
+function MeteoSamplingSpec(dt::Real, phase::Real; window::AbstractSamplingWindow=RollingWindow())
+    T = promote_type(typeof(float(dt)), typeof(float(phase)))
+    return MeteoSamplingSpec{T,typeof(window)}(T(dt), T(phase), window)
+end
+
+MeteoSamplingSpec(dt::Real; window::AbstractSamplingWindow=RollingWindow()) = MeteoSamplingSpec(dt, zero(dt); window=window)
 
 """
     MeteoTransform(target; source=target, reducer=MeanWeighted())
@@ -127,10 +174,11 @@ MeteoTransform(target::Symbol; source::Symbol=target, reducer=MeanWeighted()) = 
 
 Container holding a fine-step weather table and lazy sampling cache.
 """
-mutable struct PreparedWeather{W,T,C}
+mutable struct PreparedWeather{W,T,C,WC}
     weather::W
     transforms::T
     cache::C
+    window_cache::WC
     lazy::Bool
 end
 
@@ -140,6 +188,7 @@ function PreparedWeather(weather; transforms=default_sampling_transforms(), lazy
         weather,
         normalized,
         Dict{Tuple{Int,UInt64,UInt64},Any}(),
+        Dict{UInt64,Any}(),
         lazy
     )
 end
@@ -166,6 +215,126 @@ function _window_bounds(step::Int, spec::MeteoSamplingSpec)
     dt <= 1.0 && return step, step
     start = Int(floor(step - dt + 1.0 + 1.0e-8))
     return max(1, start), step
+end
+
+function _week_start_date(d::Dates.Date, week_start::Int)
+    offset = mod(Dates.dayofweek(d) - week_start, 7)
+    return d - Dates.Day(offset)
+end
+
+function _period_key(dt::Dates.DateTime, window::CalendarWindow)
+    d = Dates.Date(dt)
+    if window.period == :day
+        return d
+    elseif window.period == :week
+        return _week_start_date(d, window.week_start)
+    elseif window.period == :month
+        return Dates.Date(Dates.year(d), Dates.month(d), 1)
+    end
+    error("Unsupported calendar period `$(window.period)`.")
+end
+
+function _expected_period_seconds(period_key::Dates.Date, window::CalendarWindow)
+    if window.period == :day
+        return 86400.0
+    elseif window.period == :week
+        return 7.0 * 86400.0
+    elseif window.period == :month
+        return float(Dates.daysinmonth(period_key)) * 86400.0
+    end
+    error("Unsupported calendar period `$(window.period)`.")
+end
+
+function _build_calendar_window_cache(prepared::PreparedWeather, window::CalendarWindow)
+    weather = prepared.weather
+    n = length(weather)
+    period_keys = Vector{Dates.Date}(undef, n)
+    groups = Dict{Dates.Date,Vector{Int}}()
+    duration_sums = Dict{Dates.Date,Float64}()
+
+    for i in 1:n
+        row = weather[i]
+        hasproperty(row, :date) || error(
+            "CalendarWindow sampling requires `date` in weather rows. Missing at index $(i)."
+        )
+        dt = getproperty(row, :date)
+        dt isa Dates.DateTime || error(
+            "CalendarWindow sampling requires `date::DateTime`. Got `$(typeof(dt))` at index $(i)."
+        )
+        key = _period_key(dt, window)
+        period_keys[i] = key
+        push!(get!(groups, key, Int[]), i)
+        dur = hasproperty(row, :duration) ? _duration_seconds(getproperty(row, :duration)) : 1.0
+        duration_sums[key] = get(duration_sums, key, 0.0) + dur
+    end
+
+    ordered_keys = sort!(collect(keys(groups)))
+    prev_key = Dict{Dates.Date,Union{Dates.Date,Nothing}}()
+    last_key = nothing
+    for k in ordered_keys
+        prev_key[k] = last_key
+        last_key = k
+    end
+
+    indices_by_step = Vector{Vector{Int}}(undef, n)
+    complete_by_step = Vector{Bool}(undef, n)
+    for i in 1:n
+        current_key = period_keys[i]
+        selected_key = if window.anchor == :current_period
+            current_key
+        else
+            prev_key[current_key]
+        end
+
+        if isnothing(selected_key)
+            indices_by_step[i] = Int[]
+            complete_by_step[i] = false
+            continue
+        end
+
+        idxs = groups[selected_key]
+        indices_by_step[i] = idxs
+        expected = _expected_period_seconds(selected_key, window)
+        actual = duration_sums[selected_key]
+        complete_by_step[i] = isapprox(actual, expected; atol=1.0e-6, rtol=0.0)
+    end
+
+    return (; indices_by_step, complete_by_step)
+end
+
+function _window_indices(prepared::PreparedWeather, step::Int, spec::MeteoSamplingSpec)
+    window = spec.window
+    if window isa RollingWindow
+        start, stop = _window_bounds(step, spec)
+        return collect(start:stop)
+    elseif window isa CalendarWindow
+        key = UInt64(hash(window))
+        if !haskey(prepared.window_cache, key)
+            prepared.window_cache[key] = _build_calendar_window_cache(prepared, window)
+        end
+        info = prepared.window_cache[key]
+        idxs = info.indices_by_step[step]
+        complete = info.complete_by_step[step]
+
+        if isempty(idxs)
+            if window.completeness == :strict
+                error(
+                    "No period available for CalendarWindow(period=$(window.period), anchor=$(window.anchor)) at weather step $(step)."
+                )
+            end
+            return [step]
+        end
+
+        if window.completeness == :strict && !complete
+            error(
+                "Incomplete $(window.period) period for CalendarWindow(period=$(window.period), anchor=$(window.anchor)) at weather step $(step)."
+            )
+        end
+
+        return idxs
+    end
+
+    error("Unsupported sampling window type `$(typeof(window))`.")
 end
 
 function _transform_signature(transforms::AbstractVector{MeteoTransform})
@@ -319,15 +488,15 @@ function _reduce_values(vals::AbstractVector, durations::AbstractVector{<:Real},
 end
 
 function _sample_weather_uncached(
-    weather::TimeStepTable,
+    prepared::PreparedWeather,
     step::Int,
     spec::MeteoSamplingSpec,
     transforms::AbstractVector{MeteoTransform}
 )
+    weather = prepared.weather
     1 <= step <= length(weather) || error("Invalid weather step $(step), expected 1 <= step <= $(length(weather)).")
-    start, stop = _window_bounds(step, spec)
-
-    rows = [weather[i] for i in start:stop]
+    indices = _window_indices(prepared, step, spec)
+    rows = [weather[i] for i in indices]
     current = weather[step]
     durations = [
         hasproperty(r, :duration) ? _duration_seconds(getproperty(r, :duration)) : 1.0
@@ -370,7 +539,7 @@ function sample_weather(
     transforms=nothing
 )
     rules = isnothing(transforms) ? prepared.transforms : normalize_sampling_transforms(transforms)
-    spec_sig = UInt64(hash((float(spec.dt), float(spec.phase))))
+    spec_sig = UInt64(hash((float(spec.dt), float(spec.phase), spec.window)))
     tr_sig = _transform_signature(rules)
     key = (step, spec_sig, tr_sig)
 
@@ -378,7 +547,7 @@ function sample_weather(
         return prepared.cache[key]
     end
 
-    sampled = _sample_weather_uncached(prepared.weather, step, spec, rules)
+    sampled = _sample_weather_uncached(prepared, step, spec, rules)
     if prepared.lazy
         prepared.cache[key] = sampled
     end

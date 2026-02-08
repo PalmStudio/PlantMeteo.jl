@@ -70,3 +70,73 @@ using Dates
     # Symbol reducers are intentionally unsupported in the new API.
     @test_throws "Unsupported reducer value" sample_weather(prepared, 3; spec=spec2, transforms=(; T=:weighted_mean))
 end
+
+@testset "calendar window sampling" begin
+    base = Dates.DateTime(2025, 1, 1, 0, 0, 0)
+
+    day1 = [
+        Atmosphere(
+            date=base + Dates.Hour(i - 1),
+            duration=Dates.Hour(1),
+            T=float(i),
+            Wind=1.0,
+            Rh=0.50,
+            P=100.0,
+            Ri_SW_f=100.0
+        )
+        for i in 1:24
+    ]
+    day2 = [
+        Atmosphere(
+            date=base + Dates.Hour(24 + i - 1),
+            duration=Dates.Hour(1),
+            T=float(100 + i),
+            Wind=1.0,
+            Rh=0.60,
+            P=100.0,
+            Ri_SW_f=200.0
+        )
+        for i in 1:24
+    ]
+    meteo = Weather(vcat(day1, day2))
+    prepared = prepare_weather_sampler(meteo)
+
+    spec_day_current = MeteoSamplingSpec(
+        1.0;
+        window=CalendarWindow(:day; anchor=:current_period, week_start=1, completeness=:allow_partial)
+    )
+    s2 = sample_weather(prepared, 2; spec=spec_day_current)
+    @test s2.T == 12.5
+    @test s2.Tmin == 1.0
+    @test s2.Tmax == 24.0
+    @test isapprox(s2.Ri_SW_q, 8.64; atol=1.0e-9)
+
+    s26 = sample_weather(prepared, 26; spec=spec_day_current)
+    @test s26.T == 112.5
+    @test s26.Tmin == 101.0
+    @test s26.Tmax == 124.0
+    @test isapprox(s26.Ri_SW_q, 17.28; atol=1.0e-9)
+
+    spec_day_prev = MeteoSamplingSpec(
+        1.0;
+        window=CalendarWindow(:day; anchor=:previous_complete_period, week_start=1, completeness=:allow_partial)
+    )
+    s30_prev = sample_weather(prepared, 30; spec=spec_day_prev)
+    @test s30_prev.T == 12.5
+    @test s30_prev.Tmin == 1.0
+    @test s30_prev.Tmax == 24.0
+
+    spec_day_prev_strict = MeteoSamplingSpec(
+        1.0;
+        window=CalendarWindow(:day; anchor=:previous_complete_period, week_start=1, completeness=:strict)
+    )
+    @test_throws "No period available" sample_weather(prepared, 5; spec=spec_day_prev_strict)
+
+    meteo_incomplete = Weather(day1[1:12])
+    prepared_incomplete = prepare_weather_sampler(meteo_incomplete)
+    spec_day_strict = MeteoSamplingSpec(
+        1.0;
+        window=CalendarWindow(:day; anchor=:current_period, week_start=1, completeness=:strict)
+    )
+    @test_throws "Incomplete day period" sample_weather(prepared_incomplete, 3; spec=spec_day_strict)
+end

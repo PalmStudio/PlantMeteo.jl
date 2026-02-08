@@ -42,6 +42,7 @@ export get_weather
 export to_daily
 export AbstractTimeReducer
 export MeanWeighted, MeanReducer, SumReducer, MinReducer, MaxReducer, FirstReducer, LastReducer, RadiationEnergy
+export AbstractSamplingWindow, RollingWindow, CalendarWindow
 export MeteoSamplingSpec, MeteoTransform
 export PreparedWeather, prepare_weather_sampler, sample_weather, materialize_weather
 export default_sampling_transforms, normalize_sampling_transforms
