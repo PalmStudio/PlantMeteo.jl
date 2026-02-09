@@ -32,6 +32,7 @@ We make 48 hourly rows (two days) with monotonic `T`:
 ```@example sampling
 using PlantMeteo
 using Dates
+using Statistics
 
 base = DateTime(2025, 1, 1)
 meteo = Weather([

@@ -223,16 +223,34 @@ The selected indices are driven by `spec.dt` and `spec.phase` from [`MeteoSampli
 struct RollingWindow <: AbstractSamplingWindow end
 
 """
-    CalendarWindow
+    CalendarWindow(period; anchor=:current_period, week_start=1, completeness=:allow_partial)
 
 Calendar-based window selector used by [`MeteoSamplingSpec`](@ref).
 
-# Fields
+# Arguments
 
-- `period::Symbol`: calendar period (`:day`, `:week`, or `:month`).
-- `anchor::Symbol`: period anchor (`:current_period` or `:previous_complete_period`).
-- `week_start::Int`: first day of week in `1:7` (`1=Monday`, `7=Sunday`).
-- `completeness::Symbol`: handling of partial periods (`:allow_partial` or `:strict`).
+- `period::Symbol`: grouping period.
+  - `:day`: group by civil day.
+  - `:week`: group by civil week (start controlled by `week_start`).
+  - `:month`: group by calendar month.
+- `anchor::Symbol`: which period is sampled at weather step `i`.
+  - `:current_period`: sample from the period containing `weather[i].date`.
+  - `:previous_complete_period`: sample from the period immediately before the current one.
+- `week_start::Int`: week start day in `1:7` (`1=Monday`, `7=Sunday`).
+  Used only when `period == :week`.
+- `completeness::Symbol`: behavior when selected period is missing/incomplete.
+  - `:allow_partial`: accept partial periods; if no previous period exists, fallback to `[step]`.
+  - `:strict`: require a valid complete selected period; otherwise throw an error.
+
+# Notes
+
+- `CalendarWindow` requires `date::DateTime` in source weather rows.
+- Completeness is checked from summed `duration` against expected civil period duration.
+- `dt`/`phase` in [`MeteoSamplingSpec`](@ref) are not used for `CalendarWindow` selection.
+
+# Errors
+
+Throws if any argument is outside the allowed set.
 """
 struct CalendarWindow <: AbstractSamplingWindow
     period::Symbol
@@ -241,22 +259,6 @@ struct CalendarWindow <: AbstractSamplingWindow
     completeness::Symbol
 end
 
-"""
-    CalendarWindow(period; anchor=:current_period, week_start=1, completeness=:allow_partial)
-
-Build a [`CalendarWindow`](@ref) with validation.
-
-# Arguments
-
-- `period::Symbol`: one of `:day`, `:week`, `:month`.
-- `anchor::Symbol`: one of `:current_period`, `:previous_complete_period`.
-- `week_start::Int`: integer in `1:7` (`1=Monday`, `7=Sunday`).
-- `completeness::Symbol`: one of `:allow_partial`, `:strict`.
-
-# Errors
-
-Throws if any argument is outside the allowed set.
-"""
 function CalendarWindow(
     period::Symbol;
     anchor::Symbol=:current_period,
@@ -281,9 +283,21 @@ end
 """
     MeteoSamplingSpec(dt, phase=0.0; window=RollingWindow())
 
-Sampling specification used to aggregate fine-step weather into a model clock window.
-`dt` and `phase` are expressed in base weather timesteps.
-`window` selects how weather rows are selected before reducers are applied.
+Sampling specification used to aggregate fine-step weather in [`sample_weather`](@ref).
+
+# Arguments
+
+- `dt::Real`: window size in source weather timesteps.
+- `phase::Real`: model phase offset in source weather timesteps (used by rolling sampling).
+- `window::AbstractSamplingWindow`: index selection strategy, usually [`RollingWindow`](@ref)
+  or [`CalendarWindow`](@ref).
+
+# Notes
+
+- `MeteoSamplingSpec(dt; window=...)` is a convenience constructor equivalent to
+  `MeteoSamplingSpec(dt, zero(dt); window=window)`.
+- With [`RollingWindow`](@ref), both `dt` and `phase` drive window bounds.
+- With [`CalendarWindow`](@ref), period-based selection is controlled by calendar settings.
 """
 struct MeteoSamplingSpec{T<:Real,W<:AbstractSamplingWindow}
     dt::T
@@ -291,40 +305,12 @@ struct MeteoSamplingSpec{T<:Real,W<:AbstractSamplingWindow}
     window::W
 end
 
-"""
-    MeteoSamplingSpec(dt, phase; window=RollingWindow())
-
-Build a typed sampling spec for [`sample_weather`](@ref).
-
-# Arguments
-
-- `dt::Real`: window size in source weather timesteps.
-- `phase::Real`: model phase offset in source weather timesteps.
-- `window::AbstractSamplingWindow`: window selector, usually [`RollingWindow`](@ref)
-  or [`CalendarWindow`](@ref).
-"""
 function MeteoSamplingSpec(dt::Real, phase::Real; window::AbstractSamplingWindow=RollingWindow())
-    T = promote_type(typeof(dt), typeof(phase))
+    T = promote_type(typeof(float(dt)), typeof(float(phase)))
     return MeteoSamplingSpec{T,typeof(window)}(T(dt), T(phase), window)
 end
 
-"""
-    MeteoSamplingSpec(dt; window=RollingWindow())
-
-Convenience constructor equivalent to `MeteoSamplingSpec(dt, 0.0; window=window)`.
-"""
 MeteoSamplingSpec(dt::Real; window::AbstractSamplingWindow=RollingWindow()) = MeteoSamplingSpec(dt, zero(dt); window=window)
-
-"""
-    MeteoTransform(target; source=target, reducer=MeanWeighted())
-
-One weather transformation rule used by [`PlantMeteo.sample_weather`](@ref).
-"""
-struct MeteoTransform{R}
-    target::Symbol
-    source::Symbol
-    reducer::R
-end
 
 """
     MeteoTransform(target; source=target, reducer=MeanWeighted())
@@ -337,20 +323,13 @@ Build a transform rule consumed by [`sample_weather`](@ref).
 - `source::Symbol`: input variable name read from source rows.
 - `reducer`: reducer instance used on windowed values.
 """
-MeteoTransform(target::Symbol; source::Symbol=target, reducer=MeanWeighted()) = MeteoTransform(target, source, reducer)
-
-"""
-    PreparedWeather(weather; transforms=default_sampling_transforms(), lazy=true)
-
-Container holding a fine-step weather table and lazy sampling cache.
-"""
-mutable struct PreparedWeather{W,T,C,WC}
-    weather::W
-    transforms::T
-    cache::C
-    window_cache::WC
-    lazy::Bool
+struct MeteoTransform{R}
+    target::Symbol
+    source::Symbol
+    reducer::R
 end
+
+MeteoTransform(target::Symbol; source::Symbol=target, reducer=MeanWeighted()) = MeteoTransform(target, source, reducer)
 
 """
     PreparedWeather(weather; transforms=default_sampling_transforms(), lazy=true)
@@ -363,6 +342,14 @@ Build a sampler container used by [`sample_weather`](@ref).
 - `transforms`: transform specification accepted by [`normalize_sampling_transforms`](@ref).
 - `lazy::Bool`: enable memoization cache for repeated sampling queries.
 """
+mutable struct PreparedWeather{W,T,C,WC}
+    weather::W
+    transforms::T
+    cache::C
+    window_cache::WC
+    lazy::Bool
+end
+
 function PreparedWeather(weather; transforms=default_sampling_transforms(), lazy::Bool=true)
     normalized = normalize_sampling_transforms(transforms)
     PreparedWeather(
