@@ -1,3 +1,14 @@
+"""
+    AbstractTimeReducer
+
+Abstract supertype for reducers used by [`MeteoTransform`](@ref).
+
+Reducer implementations are expected to be callable with either:
+- `(vals)`
+- `(vals, durations)`
+
+See [`MeanWeighted`](@ref), [`SumReducer`](@ref), and [`RadiationEnergy`](@ref).
+"""
 abstract type AbstractTimeReducer end
 
 """
@@ -57,6 +68,20 @@ Integrate flux values (W m-2) over durations (seconds) into MJ m-2.
 struct RadiationEnergy <: AbstractTimeReducer end
 
 (::MeanWeighted)(vals::AbstractVector{<:Real}) = Statistics.mean(vals)
+"""
+    (MeanWeighted())(vals, durations)
+
+Compute duration-weighted mean.
+
+# Arguments
+
+- `vals::AbstractVector{<:Real}`: values to reduce.
+- `durations::AbstractVector{<:Real}`: per-value durations.
+
+# Returns
+
+Weighted mean, or `nothing` when the total duration is zero.
+"""
 function (::MeanWeighted)(vals::AbstractVector{<:Real}, durations::AbstractVector{<:Real})
     num = 0.0
     den = 0.0
@@ -69,44 +94,146 @@ function (::MeanWeighted)(vals::AbstractVector{<:Real}, durations::AbstractVecto
 end
 
 (::MeanReducer)(vals::AbstractVector{<:Real}) = Statistics.mean(vals)
+"""
+    (MeanReducer())(vals)
+    (MeanReducer())(vals, durations)
+
+Compute arithmetic mean of sampled values.
+
+# Arguments
+
+- `vals::AbstractVector{<:Real}`: values to reduce.
+- `durations::AbstractVector{<:Real}`: optional durations (ignored).
+"""
 (::MeanReducer)(vals::AbstractVector{<:Real}, durations::AbstractVector{<:Real}) = Statistics.mean(vals)
 
+"""
+    (SumReducer())(vals)
+    (SumReducer())(vals, durations)
+
+Compute sum of sampled values.
+
+# Arguments
+
+- `vals::AbstractVector{<:Real}`: values to reduce.
+- `durations::AbstractVector{<:Real}`: optional durations (ignored).
+"""
 (::SumReducer)(vals::AbstractVector{<:Real}) = sum(vals)
 (::SumReducer)(vals::AbstractVector{<:Real}, durations::AbstractVector{<:Real}) = sum(vals)
 
+"""
+    (MinReducer())(vals)
+    (MinReducer())(vals, durations)
+
+Compute minimum of sampled values.
+
+# Arguments
+
+- `vals::AbstractVector{<:Real}`: values to reduce.
+- `durations::AbstractVector{<:Real}`: optional durations (ignored).
+"""
 (::MinReducer)(vals::AbstractVector{<:Real}) = minimum(vals)
 (::MinReducer)(vals::AbstractVector{<:Real}, durations::AbstractVector{<:Real}) = minimum(vals)
 
+"""
+    (MaxReducer())(vals)
+    (MaxReducer())(vals, durations)
+
+Compute maximum of sampled values.
+
+# Arguments
+
+- `vals::AbstractVector{<:Real}`: values to reduce.
+- `durations::AbstractVector{<:Real}`: optional durations (ignored).
+"""
 (::MaxReducer)(vals::AbstractVector{<:Real}) = maximum(vals)
 (::MaxReducer)(vals::AbstractVector{<:Real}, durations::AbstractVector{<:Real}) = maximum(vals)
 
+"""
+    (FirstReducer())(vals)
+    (FirstReducer())(vals, durations)
+
+Return first sampled value.
+
+# Arguments
+
+- `vals::AbstractVector`: values to reduce.
+- `durations::AbstractVector{<:Real}`: optional durations (ignored).
+"""
 (::FirstReducer)(vals::AbstractVector) = first(vals)
 (::FirstReducer)(vals::AbstractVector, durations::AbstractVector{<:Real}) = first(vals)
 
+"""
+    (LastReducer())(vals)
+    (LastReducer())(vals, durations)
+
+Return last sampled value.
+
+# Arguments
+
+- `vals::AbstractVector`: values to reduce.
+- `durations::AbstractVector{<:Real}`: optional durations (ignored).
+"""
 (::LastReducer)(vals::AbstractVector) = last(vals)
 (::LastReducer)(vals::AbstractVector, durations::AbstractVector{<:Real}) = last(vals)
 
+"""
+    RadiationEnergy()(vals, durations)
+
+Integrate flux values over durations into energy in MJ m-2.
+
+# Arguments
+
+- `vals::AbstractVector{<:Real}`: flux values in W m-2.
+- `durations::AbstractVector{<:Real}`: durations in seconds or in `Dates.TimePeriod` (*e.g.* `Dates.Day`, `Dates.Minute`...).
+"""
 function (::RadiationEnergy)(vals::AbstractVector{<:Real}, durations::AbstractVector{<:Real})
     # W m-2 integrated over seconds -> MJ m-2
-    return sum(float(v) * float(d) for (v, d) in zip(vals, durations)) * 1.0e-6
+    return sum(v * d for (v, d) in zip(vals, durations)) * 1.0e-6
 end
 
+function (::RadiationEnergy)(vals::AbstractVector{<:Real}, durations::AbstractVector{<:Dates.TimePeriod})
+    return sum(v * Dates.toms(d) * 1e3 for (v, d) in zip(vals, durations)) * 1.0e-6
+end
+
+"""
+    (RadiationEnergy())(vals)
+
+Erroring fallback for duration-free reductions.
+
+Use `(RadiationEnergy())(vals, durations)` in weather sampling contexts.
+"""
 function (::RadiationEnergy)(vals::AbstractVector{<:Real})
     error("`RadiationEnergy` requires durations. Use it only in weather sampling contexts.")
 end
 
 """
-    RollingWindow()
-    CalendarWindow(period, anchor=:current_period, week_start=1, completeness=:allow_partial)
+    AbstractSamplingWindow
 
-Window selection for weather sampling.
-`RollingWindow` uses a trailing rolling window driven by `dt`.
-`CalendarWindow` groups rows by civil period (`:day`, `:week`, `:month`).
+Abstract supertype for weather window selectors used by [`MeteoSamplingSpec`](@ref).
 """
 abstract type AbstractSamplingWindow end
 
+"""
+    RollingWindow()
+
+Trailing window selector for [`sample_weather`](@ref).
+The selected indices are driven by `spec.dt` and `spec.phase` from [`MeteoSamplingSpec`](@ref).
+"""
 struct RollingWindow <: AbstractSamplingWindow end
 
+"""
+    CalendarWindow
+
+Calendar-based window selector used by [`MeteoSamplingSpec`](@ref).
+
+# Fields
+
+- `period::Symbol`: calendar period (`:day`, `:week`, or `:month`).
+- `anchor::Symbol`: period anchor (`:current_period` or `:previous_complete_period`).
+- `week_start::Int`: first day of week in `1:7` (`1=Monday`, `7=Sunday`).
+- `completeness::Symbol`: handling of partial periods (`:allow_partial` or `:strict`).
+"""
 struct CalendarWindow <: AbstractSamplingWindow
     period::Symbol
     anchor::Symbol
@@ -114,6 +241,22 @@ struct CalendarWindow <: AbstractSamplingWindow
     completeness::Symbol
 end
 
+"""
+    CalendarWindow(period; anchor=:current_period, week_start=1, completeness=:allow_partial)
+
+Build a [`CalendarWindow`](@ref) with validation.
+
+# Arguments
+
+- `period::Symbol`: one of `:day`, `:week`, `:month`.
+- `anchor::Symbol`: one of `:current_period`, `:previous_complete_period`.
+- `week_start::Int`: integer in `1:7` (`1=Monday`, `7=Sunday`).
+- `completeness::Symbol`: one of `:allow_partial`, `:strict`.
+
+# Errors
+
+Throws if any argument is outside the allowed set.
+"""
 function CalendarWindow(
     period::Symbol;
     anchor::Symbol=:current_period,
@@ -148,11 +291,28 @@ struct MeteoSamplingSpec{T<:Real,W<:AbstractSamplingWindow}
     window::W
 end
 
+"""
+    MeteoSamplingSpec(dt, phase; window=RollingWindow())
+
+Build a typed sampling spec for [`sample_weather`](@ref).
+
+# Arguments
+
+- `dt::Real`: window size in source weather timesteps.
+- `phase::Real`: model phase offset in source weather timesteps.
+- `window::AbstractSamplingWindow`: window selector, usually [`RollingWindow`](@ref)
+  or [`CalendarWindow`](@ref).
+"""
 function MeteoSamplingSpec(dt::Real, phase::Real; window::AbstractSamplingWindow=RollingWindow())
     T = promote_type(typeof(float(dt)), typeof(float(phase)))
     return MeteoSamplingSpec{T,typeof(window)}(T(dt), T(phase), window)
 end
 
+"""
+    MeteoSamplingSpec(dt; window=RollingWindow())
+
+Convenience constructor equivalent to `MeteoSamplingSpec(dt, 0.0; window=window)`.
+"""
 MeteoSamplingSpec(dt::Real; window::AbstractSamplingWindow=RollingWindow()) = MeteoSamplingSpec(dt, zero(dt); window=window)
 
 """
@@ -166,6 +326,17 @@ struct MeteoTransform{R}
     reducer::R
 end
 
+"""
+    MeteoTransform(target; source=target, reducer=MeanWeighted())
+
+Build a transform rule consumed by [`sample_weather`](@ref).
+
+# Arguments
+
+- `target::Symbol`: output variable name in sampled weather.
+- `source::Symbol`: input variable name read from source rows.
+- `reducer`: reducer instance used on windowed values.
+"""
 MeteoTransform(target::Symbol; source::Symbol=target, reducer=MeanWeighted()) = MeteoTransform(target, source, reducer)
 
 """
@@ -181,6 +352,17 @@ mutable struct PreparedWeather{W,T,C,WC}
     lazy::Bool
 end
 
+"""
+    PreparedWeather(weather; transforms=default_sampling_transforms(), lazy=true)
+
+Build a sampler container used by [`sample_weather`](@ref).
+
+# Arguments
+
+- `weather`: source weather table (`TimeStepTable{Atmosphere}` or compatible rows).
+- `transforms`: transform specification accepted by [`normalize_sampling_transforms`](@ref).
+- `lazy::Bool`: enable memoization cache for repeated sampling queries.
+"""
 function PreparedWeather(weather; transforms=default_sampling_transforms(), lazy::Bool=true)
     normalized = normalize_sampling_transforms(transforms)
     PreparedWeather(
@@ -196,10 +378,29 @@ end
     prepare_weather_sampler(weather; transforms=default_sampling_transforms(), lazy=true)
 
 Build the [`PreparedWeather`](@ref) container holding a fine-step weather table and lazy sampling cache.
+
+# Arguments
+
+- `weather`: source weather table.
+- `transforms`: transform specification accepted by [`normalize_sampling_transforms`](@ref).
+- `lazy::Bool`: enable/disable sampling cache.
 """
 prepare_weather_sampler(weather; transforms=default_sampling_transforms(), lazy::Bool=true) =
     PreparedWeather(weather; transforms=transforms, lazy=lazy)
 
+"""
+    _duration_seconds(d)
+
+Convert a duration-like value to seconds.
+
+# Arguments
+
+- `d`: a `Dates.Period`, a real value already in seconds, or another value.
+
+# Returns
+
+`Float64` seconds. Unknown types fall back to `1.0`.
+"""
 function _duration_seconds(d)
     if d isa Dates.Period
         return float(Dates.toms(d)) * 1.0e-3
@@ -209,11 +410,30 @@ function _duration_seconds(d)
     return 1.0
 end
 
+"""
+    _duration_period_from_seconds(sec)
+
+Convert seconds to a `Dates.Millisecond` period used in sampled outputs.
+
+# Arguments
+
+- `sec::Float64`: duration in seconds.
+"""
 function _duration_period_from_seconds(sec::Float64)
     ms = round(Int, sec * 1000.0)
     return Dates.Millisecond(ms)
 end
 
+"""
+    _window_bounds(step, spec)
+
+Compute inclusive trailing bounds `(start, stop)` for a [`RollingWindow`](@ref).
+
+# Arguments
+
+- `step::Int`: current weather index.
+- `spec::MeteoSamplingSpec`: sampling spec containing `dt`.
+"""
 function _window_bounds(step::Int, spec::MeteoSamplingSpec)
     dt = float(spec.dt)
     dt <= 1.0 && return step, step
@@ -221,11 +441,31 @@ function _window_bounds(step::Int, spec::MeteoSamplingSpec)
     return max(1, start), step
 end
 
+"""
+    _week_start_date(d, week_start)
+
+Return the civil week start date containing `d`.
+
+# Arguments
+
+- `d::Dates.Date`: date to classify.
+- `week_start::Int`: week start day in `1:7` (`1=Monday`, `7=Sunday`).
+"""
 function _week_start_date(d::Dates.Date, week_start::Int)
     offset = mod(Dates.dayofweek(d) - week_start, 7)
     return d - Dates.Day(offset)
 end
 
+"""
+    _period_key(dt, window)
+
+Map a `DateTime` to the canonical period key used by [`CalendarWindow`](@ref).
+
+# Arguments
+
+- `dt::Dates.DateTime`: timestamp to classify.
+- `window::CalendarWindow`: window configuration (day/week/month).
+"""
 function _period_key(dt::Dates.DateTime, window::CalendarWindow)
     d = Dates.Date(dt)
     if window.period == :day
@@ -238,6 +478,16 @@ function _period_key(dt::Dates.DateTime, window::CalendarWindow)
     error("Unsupported calendar period `$(window.period)`.")
 end
 
+"""
+    _expected_period_seconds(period_key, window)
+
+Return expected duration in seconds for a complete calendar period.
+
+# Arguments
+
+- `period_key::Dates.Date`: canonical period key from `_period_key`.
+- `window::CalendarWindow`: window configuration.
+"""
 function _expected_period_seconds(period_key::Dates.Date, window::CalendarWindow)
     if window.period == :day
         return 86400.0
@@ -249,6 +499,22 @@ function _expected_period_seconds(period_key::Dates.Date, window::CalendarWindow
     error("Unsupported calendar period `$(window.period)`.")
 end
 
+"""
+    _build_calendar_window_cache(prepared, window)
+
+Precompute per-step indices and completeness flags for [`CalendarWindow`](@ref) sampling.
+
+# Arguments
+
+- `prepared::PreparedWeather`: source weather container.
+- `window::CalendarWindow`: calendar window settings.
+
+# Returns
+
+Named tuple with:
+- `indices_by_step::Vector{Vector{Int}}`
+- `complete_by_step::Vector{Bool}`
+"""
 function _build_calendar_window_cache(prepared::PreparedWeather, window::CalendarWindow)
     weather = prepared.weather
     n = length(weather)
@@ -306,6 +572,17 @@ function _build_calendar_window_cache(prepared::PreparedWeather, window::Calenda
     return (; indices_by_step, complete_by_step)
 end
 
+"""
+    _window_indices(prepared, step, spec)
+
+Return source weather indices selected for one sampling query.
+
+# Arguments
+
+- `prepared::PreparedWeather`: source weather container.
+- `step::Int`: current weather index.
+- `spec::MeteoSamplingSpec`: sampling specification.
+"""
 function _window_indices(prepared::PreparedWeather, step::Int, spec::MeteoSamplingSpec)
     window = spec.window
     if window isa RollingWindow
@@ -341,6 +618,15 @@ function _window_indices(prepared::PreparedWeather, step::Int, spec::MeteoSampli
     error("Unsupported sampling window type `$(typeof(window))`.")
 end
 
+"""
+    _transform_signature(transforms)
+
+Compute a deterministic hash signature for transform rules used in cache keys.
+
+# Arguments
+
+- `transforms::AbstractVector{MeteoTransform}`: normalized transform rules.
+"""
 function _transform_signature(transforms::AbstractVector{MeteoTransform})
     h = hash(length(transforms))
     for t in transforms
@@ -349,6 +635,11 @@ function _transform_signature(transforms::AbstractVector{MeteoTransform})
     return UInt64(h)
 end
 
+"""
+    _default_radiation_flux_vars()
+
+Return default radiation source variable names used by [`default_sampling_transforms`](@ref).
+"""
 function _default_radiation_flux_vars()
     (
         :Ri_SW_f,
@@ -368,6 +659,14 @@ Default weather sampling rules.
 - `:flux_mean`: duration-weighted mean flux (same units as source)
 - `:energy_sum`: integrated quantity in MJ m-2 over the sampling window
 - `:both`: keep `Ri_*_f` as weighted-mean flux and also emit `Ri_*_q` quantities
+
+# Arguments
+
+- `radiation_mode::Symbol`: one of `:flux_mean`, `:energy_sum`, `:both`.
+
+# Returns
+
+`Vector{MeteoTransform}` used by [`PreparedWeather`](@ref) and [`sample_weather`](@ref).
 """
 function default_sampling_transforms(; radiation_mode::Symbol=:both)
     radiation_mode in (:flux_mean, :energy_sum, :both) || error(
@@ -414,6 +713,20 @@ function default_sampling_transforms(; radiation_mode::Symbol=:both)
     return transforms
 end
 
+"""
+    _normalize_reducer(reducer)
+
+Normalize user reducer definitions into a callable reducer object.
+
+# Arguments
+
+- `reducer`: reducer instance/type or callable.
+
+# Returns
+
+- Reducer instance when input is a reducer type.
+- Reducer/callable unchanged when already instantiated.
+"""
 function _normalize_reducer(reducer)
     if reducer isa DataType
         reducer <: AbstractTimeReducer || error(
@@ -433,6 +746,16 @@ function _normalize_reducer(reducer)
     )
 end
 
+"""
+    _normalize_single_transform(target, rule)
+
+Normalize one transform specification entry into a [`MeteoTransform`](@ref).
+
+# Arguments
+
+- `target::Symbol`: output variable name.
+- `rule`: reducer-like value or named tuple with optional `source` and `reducer`.
+"""
 function _normalize_single_transform(target::Symbol, rule)
     if rule isa NamedTuple
         src = haskey(rule, :source) ? Symbol(rule.source) : target
@@ -457,6 +780,14 @@ Accepted inputs are:
 
 This is the canonical parser used by [`PreparedWeather`](@ref) and
 [`sample_weather`](@ref) to validate and materialize transform rules.
+
+# Arguments
+
+- `transforms`: user transform specification (named tuple or vector forms).
+
+# Returns
+
+`Vector{MeteoTransform}`.
 """
 function normalize_sampling_transforms(transforms::AbstractVector{MeteoTransform})
     return collect(transforms)
@@ -482,6 +813,22 @@ function normalize_sampling_transforms(transforms::AbstractVector)
     return out
 end
 
+"""
+    _reduce_values(vals, durations, reducer)
+
+Apply one reducer to sampled values and optional durations.
+
+# Arguments
+
+- `vals::AbstractVector`: sampled source values for one transform.
+- `durations::AbstractVector{<:Real}`: per-value durations in seconds.
+- `reducer`: normalized reducer instance or callable.
+
+# Returns
+
+Reduced value, or `nothing` when reduction is not possible (for example non-real values
+with real-only reducers).
+"""
 function _reduce_values(vals::AbstractVector, durations::AbstractVector{<:Real}, reducer)
     isempty(vals) && return nothing
     if reducer isa AbstractTimeReducer
@@ -506,6 +853,22 @@ function _reduce_values(vals::AbstractVector, durations::AbstractVector{<:Real},
     error("Reducer `$(reducer)` is not callable on sampled weather values.")
 end
 
+"""
+    _sample_weather_uncached(prepared, step, spec, transforms)
+
+Compute one sampled weather row without using/setting cache.
+
+# Arguments
+
+- `prepared::PreparedWeather`: source weather container.
+- `step::Int`: index of the current source weather row.
+- `spec::MeteoSamplingSpec`: sampling specification.
+- `transforms::AbstractVector{MeteoTransform}`: normalized transform rules.
+
+# Returns
+
+`Atmosphere` sampled at `step`.
+"""
 function _sample_weather_uncached(
     prepared::PreparedWeather,
     step::Int,
@@ -601,6 +964,12 @@ end
 
 Precompute sampled weather tables for a set of sampling specs.
 Returns `Dict{MeteoSamplingSpec,TimeStepTable{Atmosphere}}`.
+
+# Arguments
+
+- `prepared::PreparedWeather`: sampler state containing source weather.
+- `specs`: iterable collection of [`MeteoSamplingSpec`](@ref).
+- `transforms`: optional transform override applied to all specs.
 """
 function materialize_weather(prepared::PreparedWeather; specs, transforms=nothing)
     tables = Dict{MeteoSamplingSpec,TimeStepTable{Atmosphere}}()

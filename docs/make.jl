@@ -1,8 +1,8 @@
 using PlantMeteo
 using Documenter
-using Dates
+using Dates, Statistics
 
-DocMeta.setdocmeta!(PlantMeteo, :DocTestSetup, :(using PlantMeteo, Dates); recursive=true)
+DocMeta.setdocmeta!(PlantMeteo, :DocTestSetup, :(using PlantMeteo, Dates, Statistics); recursive=true)
 
 makedocs(;
     modules=[PlantMeteo],
@@ -17,6 +17,11 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Getting Started" => "getting-started.md",
+        "Guides" => [
+            "Weather Data Sources" => "weather-apis.md",
+            "Weather Sampling" => "weather-sampling.md",
+        ],
         "API" => "API.md"
     ]
 )
