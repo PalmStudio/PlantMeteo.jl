@@ -86,8 +86,8 @@ function (::MeanWeighted)(vals::AbstractVector{<:Real}, durations::AbstractVecto
     num = 0.0
     den = 0.0
     for (v, d) in zip(vals, durations)
-        num += float(v) * float(d)
-        den += float(d)
+        num += v * d
+        den += d
     end
     den == 0.0 && return nothing
     return num / den
@@ -304,7 +304,7 @@ Build a typed sampling spec for [`sample_weather`](@ref).
   or [`CalendarWindow`](@ref).
 """
 function MeteoSamplingSpec(dt::Real, phase::Real; window::AbstractSamplingWindow=RollingWindow())
-    T = promote_type(typeof(float(dt)), typeof(float(phase)))
+    T = promote_type(typeof(dt), typeof(phase))
     return MeteoSamplingSpec{T,typeof(window)}(T(dt), T(phase), window)
 end
 
@@ -403,9 +403,9 @@ Convert a duration-like value to seconds.
 """
 function _duration_seconds(d)
     if d isa Dates.Period
-        return float(Dates.toms(d)) * 1.0e-3
+        return Dates.toms(d) * 1.0e-3
     elseif d isa Real
-        return float(d)
+        return d
     end
     return 1.0
 end
@@ -435,7 +435,7 @@ Compute inclusive trailing bounds `(start, stop)` for a [`RollingWindow`](@ref).
 - `spec::MeteoSamplingSpec`: sampling spec containing `dt`.
 """
 function _window_bounds(step::Int, spec::MeteoSamplingSpec)
-    dt = float(spec.dt)
+    dt = spec.dt
     dt <= 1.0 && return step, step
     start = Int(floor(step - dt + 1.0 + 1.0e-8))
     return max(1, start), step
@@ -494,7 +494,7 @@ function _expected_period_seconds(period_key::Dates.Date, window::CalendarWindow
     elseif window.period == :week
         return 7.0 * 86400.0
     elseif window.period == :month
-        return float(Dates.daysinmonth(period_key)) * 86400.0
+        return Dates.daysinmonth(period_key) * 86400.0
     end
     error("Unsupported calendar period `$(window.period)`.")
 end
@@ -944,7 +944,7 @@ function sample_weather(
     transforms=nothing
 )
     rules = isnothing(transforms) ? prepared.transforms : normalize_sampling_transforms(transforms)
-    spec_sig = UInt64(hash((float(spec.dt), float(spec.phase), spec.window)))
+    spec_sig = UInt64(hash((spec.dt, spec.phase, spec.window)))
     tr_sig = _transform_signature(rules)
     key = (step, spec_sig, tr_sig)
 

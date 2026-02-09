@@ -78,7 +78,7 @@ end
         Atmosphere(
             date=base + Dates.Hour(i - 1),
             duration=Dates.Hour(1),
-            T=float(i),
+            T=i,
             Wind=1.0,
             Rh=0.50,
             P=100.0,
@@ -90,7 +90,7 @@ end
         Atmosphere(
             date=base + Dates.Hour(24 + i - 1),
             duration=Dates.Hour(1),
-            T=float(100 + i),
+            T=100 + i,
             Wind=1.0,
             Rh=0.60,
             P=100.0,
