@@ -9,43 +9,44 @@ CurrentModule = PlantMeteo
 [![Build Status](https://github.com/PalmStudio/PlantMeteo.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/PalmStudio/PlantMeteo.jl/actions/workflows/CI.yml?query=branch%3Amain)
 [![Coverage](https://codecov.io/gh/PalmStudio/PlantMeteo.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/VEZY/PlantMeteo.jl)
 
-## Overview
+## What Problem This Package Solves
 
-`PlantMeteo` is for everything related to meteorological/climatic data related to plant growth. 
+Plant models often consume weather data from very different sources:
 
-The package gives users access to useful and efficient structures, functions for reading and computing data and easy connection to weather APIs:
+- station files with inconsistent column names and units
+- API data with provider-specific schemas
+- time steps that do not match your model clock (hourly input, daily model, multi-rate simulation)
 
-- [`TimeStepTable`](@ref) to define efficient tables
-- [`Atmosphere`](@ref) to automatically compute atmosphere-related variables from a set of variables
-- [`Constants`](@ref) that provide default values for physical constants (*e.g.* the universal gas constant or the latent heat of vaporization of water)
-- helper functions such as [`vapor_pressure`](@ref), [`e_sat`](@ref), [`air_density`](@ref), [`psychrometer_constant`](@ref) or [`latent_heat_vaporization`](@ref)
-- easy download of weather data from renowned APIs such as [open-meteo.com](https://open-meteo.com/en) with [`OpenMeteo`](@ref)
-- and a framework to easily add more APIs thanks to [`get_weather`](@ref)
+`PlantMeteo` gives you a single workflow to standardize, inspect, and aggregate weather data into a structure that downstream plant models can use directly.
+
+## What You Get
+
+- A weather table abstraction with [`TimeStepTable`](@ref), [`Weather`](@ref), and [`Atmosphere`](@ref)
+- File ingestion and export with [`read_weather`](@ref) and [`write_weather`](@ref)
+- API retrieval through [`get_weather`](@ref) with the built-in [`OpenMeteo`](@ref) backend
+- A configurable sampler for model-aligned aggregation with [`prepare_weather_sampler`](@ref), [`sample_weather`](@ref), and [`materialize_weather`](@ref)
+
+## Who This Is For
+
+- model developers who need robust weather preprocessing before simulation
+- researchers combining historical files and forecast APIs
+- package authors who want to plug custom weather providers behind one interface
+
+## Documentation Map
+
+- Start with [Getting Started](getting-started.md)
+- Continue with in-depth guides:
+  - [Weather Data Sources](weather-apis.md)
+  - [Weather Sampling](weather-sampling.md)
+- Use [API](API.md) for full reference
 
 ## Installation
 
-To install the package, enter the Julia package manager mode by pressing `]` in the REPL, and execute the following command:
+From the Julia package REPL, run `add PlantMeteo`.
+Then load it with `using PlantMeteo`.
 
-```julia
-add PlantMeteo
-```
-
-To use the package, execute this command from the Julia REPL:
-
-```julia
-using PlantMeteo
-```
-
-## Projects that use PlantMeteo
-
-Take a look at these projects that use PlantSimEngine:
+## Projects Using PlantMeteo
 
 - [PlantSimEngine.jl](https://github.com/VEZY/PlantSimEngine.jl)
 - [PlantBiophysics.jl](https://github.com/VEZY/PlantBiophysics.jl)
 - [XPalm](https://github.com/PalmStudio/XPalm.jl)
-
-## Make it yours 
-
-The package is developed so anyone can easily integrate it into workflows and packages. For example [`TimeStepTable`](@ref) can be used for any type of data. See the implementation of `TimeStepTable{Status}` in [PlantSimEngine.jl](https://github.com/VEZY/PlantSimEngine.jl).
-
-If you develop such tools and it is not on the list yet, please make a PR or contact me so we can add it! 😃
