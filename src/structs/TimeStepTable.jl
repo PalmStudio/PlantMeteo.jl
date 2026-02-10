@@ -244,6 +244,12 @@ function Base.getindex(ts::TimeStepTable, index)
     getproperty(ts, Symbol(index))
 end
 
+# Indexing with a vector/range of rows returns a TimeStepTable subset.
+@inline function Base.getindex(ts::TimeStepTable, row_inds::AbstractVector{<:Integer})
+    rows = getfield(ts, :ts)[row_inds]
+    TimeStepTable(getfield(ts, :names), getfield(ts, :metadata), rows)
+end
+
 # Setting the values of a variable in a TimeStepTable object is done by indexing the object
 # and then providing the values for the variable (must match the length).
 function Base.setproperty!(ts::TimeStepTable, s::Symbol, x)
@@ -296,6 +302,11 @@ Base.axes(ts::TimeStepTable) = (firstindex(ts):lastindex(ts), firstindex(ts, 2):
 # Indexing a TimeStepTable with a colon (e.g. `ts[1,:]`) gives all values in column.
 @inline function Base.getindex(ts::TimeStepTable, row_ind::Integer, ::Colon)
     return getindex(ts, row_ind)
+end
+
+# Indexing a TimeStepTable with multiple rows and all columns gives a TimeStepTable subset.
+@inline function Base.getindex(ts::TimeStepTable, row_inds::AbstractVector{<:Integer}, ::Colon)
+    return getindex(ts, row_inds)
 end
 
 # Indexing a TimeStepTable with a colon (e.g. `ts[:,1]`) gives all values in the row.

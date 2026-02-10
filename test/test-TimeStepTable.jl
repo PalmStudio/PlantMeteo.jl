@@ -45,6 +45,16 @@ for row_type in row_types
         # Indexing as a Matrix:
         @test ts[1, :] == ts_first
         @test ts[:, 1] == getindex(cols, names(ts)[1])
+        @test ts[1:2] isa TimeStepTable
+        @test ts[1:2] == ts
+        @test ts[1:2, :] isa TimeStepTable
+        @test ts[1:2, :] == ts
+        @test PlantMeteo.row_struct(ts[[2, 1]][1, :]) == PlantMeteo.row_struct(ts[2, :])
+        @test PlantMeteo.row_struct(ts[[2, 1]][2, :]) == PlantMeteo.row_struct(ts[1, :])
+        @test length(ts[1:0]) == 0
+        @test length(ts[1:0, :]) == 0
+        @test_throws BoundsError ts[1:3]
+        @test_throws BoundsError ts[1:3, :]
 
         # Get column names:
         @test Tables.columnnames(ts) == (keys(row_type)...,)
