@@ -53,7 +53,7 @@ meteo
 
 ## 2. Prepare Sampler State
 
-We can normalize transforms and enable query-level memoization with `prepare_weather_sampler`. This is optional but can speed up repeated calls with the same specs.
+We can normalize transforms and enable query-level memoization with `prepare_weather_sampler`. This is optional but can speed up repeated calls with the same windows.
 This is done so that repeated identical calls can return cached objects (`lazy=true`).
 
 ```@example sampling
@@ -66,9 +66,9 @@ typeof(prepared)
 We can then aggregate over a trailing window in source-step units using `sample_weather`, which returns one aggregated `Atmosphere`.
 
 ```@example sampling
-spec2 = MeteoSamplingSpec(2.0, 1.0)
-row3 = sample_weather(prepared, 3; spec = spec2)
-row3_cached = sample_weather(prepared, 3; spec = spec2)
+window2 = RollingWindow(2.0)
+row3 = sample_weather(prepared, 3; window = window2)
+row3_cached = sample_weather(prepared, 3; window = window2)
 
 (row3.T, row3.Tmin, row3.Tmax, row3_cached === row3)
 ```
@@ -86,7 +86,7 @@ custom = (
     Tsum = (source = :T, reducer = SumReducer())
 )
 
-row_custom = sample_weather(prepared, 3; spec = spec2, transforms = custom)
+row_custom = sample_weather(prepared, 3; window = window2, transforms = custom)
 (row_custom.T, row_custom.Tmax, row_custom.Tsum)
 ```
 
@@ -96,17 +96,8 @@ Sometimes model logic is tied to civil periods (day/week/month) rather than fixe
 This is useful for *e.g.* daily models that need to aggregate all hourly steps that fall within the same day, regardless of how many there are or where they fall in the source data. For example if you need the average temperature for the day, you can use a `CalendarWindow` anchored to the current period:
 
 ```@example sampling
-spec_day = MeteoSamplingSpec(
-    1.0;
-    window = CalendarWindow(
-        :day;
-        anchor = :current_period,
-        week_start = 1,
-        completeness = :allow_partial
-    )
-)
-
-day_sample = sample_weather(prepared, 5; spec = spec_day)
+window_day = CalendarWindow(:day)
+day_sample = sample_weather(prepared, 5; window = window_day)
 (day_sample.T, day_sample.Tmin, day_sample.Tmax, day_sample.duration)
 ```
 
@@ -119,14 +110,14 @@ mean(meteo[i].T for i in 1:24)
 The result would be the same for any hour from 1 to 24, since they all fall in the same day:
 
 ```@example sampling
-day_sample2 = sample_weather(prepared, 20; spec = spec_day)
+day_sample2 = sample_weather(prepared, 20; window = window_day)
 day_sample2.T == day_sample.T
 ```
 
-The aggregated results are cached, so repeated calls with the same spec and query step will return the same values, and it means that performance will be ensured for long simulation loops with repeated calls:
+The aggregated results are cached, so repeated calls with the same window and query step will return the same values, and it means that performance will be ensured for long simulation loops with repeated calls:
 
 ```@example sampling
-day_sample_cached = sample_weather(prepared, 6; spec = spec_day)
+day_sample_cached = sample_weather(prepared, 6; window = window_day)
 day_sample_cached.T === day_sample.T
 ```
 
@@ -136,17 +127,17 @@ The returned `Atmosphere` is different though, since the date (and sometimes dur
 day_sample.date, day_sample_cached.date, day_sample2.date
 ```
 
-Note that `CalendarWindow` expects a `date::DateTime` column in the weather. And with `completeness = :strict`, incomplete periods raise an error.
+Note that `CalendarWindow` expects a `date::DateTime` column in the weather. By default, it checks for completeness of the period, but you can use `completeness = :allow_partial` to authorize incomplete periods. This is also faster since it doesn't have to perform checks.
 
 ## 6. Precompute for Simulation Loops
 
-When running long simulations, you can precompute all sampled weather tables upfront rather than sampling on-demand at each step. This trades a one-time preprocessing cost for faster lookups during the simulation loop. The `materialize_weather` function returns one sampled table per requested sampling spec, allowing efficient access throughout your simulation.
+When running long simulations, you can precompute all sampled weather tables upfront rather than sampling on-demand at each step. This trades a one-time preprocessing cost for faster lookups during the simulation loop. The `materialize_weather` function returns one sampled table per requested sampling window, allowing efficient access throughout your simulation.
 
 ```@example sampling
-specs = [spec2, spec_day]
-tables = materialize_weather(prepared; specs = specs)
+windows = [window2, window_day]
+tables = materialize_weather(prepared; windows = windows)
 
-(length(tables), length(tables[spec2]), tables[spec2][3].T ≈ row3.T)
+(length(tables), length(tables[window2]), tables[window2][3].T ≈ row3.T)
 ```
 
 This is typically the best approach when you perform many simulations with the same weather, *e.g.* for model calibration, sensitivity analysis, or system optimization.

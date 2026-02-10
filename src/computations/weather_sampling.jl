@@ -210,22 +210,34 @@ end
 """
     AbstractSamplingWindow
 
-Abstract supertype for weather window selectors used by [`MeteoSamplingSpec`](@ref).
+Abstract supertype for weather window selectors used by [`sample_weather`](@ref).
 """
 abstract type AbstractSamplingWindow end
 
 """
-    RollingWindow()
+    RollingWindow(dt=1.0)
 
 Trailing window selector for [`sample_weather`](@ref).
-The selected indices are driven by `spec.dt` and `spec.phase` from [`MeteoSamplingSpec`](@ref).
+
+# Arguments
+
+- `dt::Real`: trailing window length in source weather timesteps.
+
+# Notes
+
+- `RollingWindow()` is equivalent to `RollingWindow(1.0)` (identity window).
 """
-struct RollingWindow <: AbstractSamplingWindow end
+struct RollingWindow <: AbstractSamplingWindow
+    dt::Float64
+end
+
+RollingWindow(dt::Real) = RollingWindow(float(dt))
+RollingWindow() = RollingWindow(1.0)
 
 """
     CalendarWindow(period; anchor=:current_period, week_start=1, completeness=:allow_partial)
 
-Calendar-based window selector used by [`MeteoSamplingSpec`](@ref).
+Calendar-based window selector used by [`sample_weather`](@ref).
 
 # Arguments
 
@@ -240,13 +252,12 @@ Calendar-based window selector used by [`MeteoSamplingSpec`](@ref).
   Used only when `period == :week`.
 - `completeness::Symbol`: behavior when selected period is missing/incomplete.
   - `:allow_partial`: accept partial periods; if no previous period exists, fallback to `[step]`.
-  - `:strict`: require a valid complete selected period; otherwise throw an error.
+  - `:strict`: require a valid complete selected period (default); otherwise throw an error.
 
 # Notes
 
 - `CalendarWindow` requires `date::DateTime` in source weather rows.
 - Completeness is checked from summed `duration` against expected civil period duration.
-- `dt`/`phase` in [`MeteoSamplingSpec`](@ref) are not used for `CalendarWindow` selection.
 
 # Errors
 
@@ -263,7 +274,7 @@ function CalendarWindow(
     period::Symbol;
     anchor::Symbol=:current_period,
     week_start::Int=1,
-    completeness::Symbol=:allow_partial
+    completeness::Symbol=:stict
 )
     period in (:day, :week, :month) || error(
         "Unsupported calendar period `$(period)`. Allowed values are :day, :week, :month."
@@ -275,42 +286,10 @@ function CalendarWindow(
         "Invalid `week_start=$(week_start)`. Allowed values are integers in 1:7 (1=Monday, 7=Sunday)."
     )
     completeness in (:allow_partial, :strict) || error(
-        "Unsupported completeness mode `$(completeness)`. Allowed values are :allow_partial, :strict."
+        "Unsupported completeness mode `$(completeness)`. Allowed values are :strict or :allow_partial."
     )
     return CalendarWindow(period, anchor, Int(week_start), completeness)
 end
-
-"""
-    MeteoSamplingSpec(dt, phase=0.0; window=RollingWindow())
-
-Sampling specification used to aggregate fine-step weather in [`sample_weather`](@ref).
-
-# Arguments
-
-- `dt::Real`: window size in source weather timesteps.
-- `phase::Real`: model phase offset in source weather timesteps (used by rolling sampling).
-- `window::AbstractSamplingWindow`: index selection strategy, usually [`RollingWindow`](@ref)
-  or [`CalendarWindow`](@ref).
-
-# Notes
-
-- `MeteoSamplingSpec(dt; window=...)` is a convenience constructor equivalent to
-  `MeteoSamplingSpec(dt, zero(dt); window=window)`.
-- With [`RollingWindow`](@ref), both `dt` and `phase` drive window bounds.
-- With [`CalendarWindow`](@ref), period-based selection is controlled by calendar settings.
-"""
-struct MeteoSamplingSpec{T<:Real,W<:AbstractSamplingWindow}
-    dt::T
-    phase::T
-    window::W
-end
-
-function MeteoSamplingSpec(dt::Real, phase::Real; window::AbstractSamplingWindow=RollingWindow())
-    T = promote_type(typeof(float(dt)), typeof(float(phase)))
-    return MeteoSamplingSpec{T,typeof(window)}(T(dt), T(phase), window)
-end
-
-MeteoSamplingSpec(dt::Real; window::AbstractSamplingWindow=RollingWindow()) = MeteoSamplingSpec(dt, zero(dt); window=window)
 
 """
     MeteoTransform(target; source=target, reducer=MeanWeighted())
@@ -412,17 +391,17 @@ function _duration_period_from_seconds(sec::Float64)
 end
 
 """
-    _window_bounds(step, spec)
+    _window_bounds(step, window)
 
 Compute inclusive trailing bounds `(start, stop)` for a [`RollingWindow`](@ref).
 
 # Arguments
 
 - `step::Int`: current weather index.
-- `spec::MeteoSamplingSpec`: sampling spec containing `dt`.
+- `window::RollingWindow`: rolling window configuration.
 """
-function _window_bounds(step::Int, spec::MeteoSamplingSpec)
-    dt = spec.dt
+function _window_bounds(step::Int, window::RollingWindow)
+    dt = window.dt
     dt <= 1.0 && return step, step
     start = Int(floor(step - dt + 1.0 + 1.0e-8))
     return max(1, start), step
@@ -560,7 +539,7 @@ function _build_calendar_window_cache(prepared::PreparedWeather, window::Calenda
 end
 
 """
-    _window_indices(prepared, step, spec)
+    _window_indices(prepared, step, window)
 
 Return source weather indices selected for one sampling query.
 
@@ -568,12 +547,11 @@ Return source weather indices selected for one sampling query.
 
 - `prepared::PreparedWeather`: source weather container.
 - `step::Int`: current weather index.
-- `spec::MeteoSamplingSpec`: sampling specification.
+- `window::AbstractSamplingWindow`: window selection strategy.
 """
-function _window_indices(prepared::PreparedWeather, step::Int, spec::MeteoSamplingSpec)
-    window = spec.window
+function _window_indices(prepared::PreparedWeather, step::Int, window::AbstractSamplingWindow)
     if window isa RollingWindow
-        start, stop = _window_bounds(step, spec)
+        start, stop = _window_bounds(step, window)
         return collect(start:stop)
     elseif window isa CalendarWindow
         key = UInt64(hash(window))
@@ -841,7 +819,7 @@ function _reduce_values(vals::AbstractVector, durations::AbstractVector{<:Real},
 end
 
 """
-    _sample_weather_uncached(prepared, step, spec, transforms)
+    _sample_weather_uncached(prepared, step, window, transforms)
 
 Compute one sampled weather row without using/setting cache.
 
@@ -849,7 +827,7 @@ Compute one sampled weather row without using/setting cache.
 
 - `prepared::PreparedWeather`: source weather container.
 - `step::Int`: index of the current source weather row.
-- `spec::MeteoSamplingSpec`: sampling specification.
+- `window::AbstractSamplingWindow`: window selection strategy.
 - `transforms::AbstractVector{MeteoTransform}`: normalized transform rules.
 
 # Returns
@@ -859,12 +837,12 @@ Compute one sampled weather row without using/setting cache.
 function _sample_weather_uncached(
     prepared::PreparedWeather,
     step::Int,
-    spec::MeteoSamplingSpec,
+    window::AbstractSamplingWindow,
     transforms::AbstractVector{MeteoTransform}
 )
     weather = prepared.weather
     1 <= step <= length(weather) || error("Invalid weather step $(step), expected 1 <= step <= $(length(weather)).")
-    indices = _window_indices(prepared, step, spec)
+    indices = _window_indices(prepared, step, window)
     rows = [weather[i] for i in indices]
     current = weather[step]
     durations = [
@@ -902,7 +880,7 @@ function _sample_weather_uncached(
 end
 
 """
-    sample_weather(prepared, step; spec=MeteoSamplingSpec(1.0, 0.0), transforms=nothing)
+    sample_weather(prepared, step; window=RollingWindow(1.0), transforms=nothing)
 
 Sample one aggregated weather row at `step` from a [`PreparedWeather`](@ref) sampler.
 
@@ -913,8 +891,8 @@ Sample one aggregated weather row at `step` from a [`PreparedWeather`](@ref) sam
 
 # Keyword arguments
 
-- `spec::MeteoSamplingSpec`: window definition and phase used to select rows before reduction.
-  The default `MeteoSamplingSpec(1.0, 0.0)` behaves as an identity window.
+- `window::AbstractSamplingWindow`: selection strategy used before reduction.
+  The default `RollingWindow(1.0)` behaves as an identity window.
 - `transforms`: optional transform override for this call.
   If `nothing`, uses `prepared.transforms`; otherwise accepted by
   [`normalize_sampling_transforms`](@ref) (e.g. `NamedTuple` or `Vector{MeteoTransform}`).
@@ -922,24 +900,24 @@ Sample one aggregated weather row at `step` from a [`PreparedWeather`](@ref) sam
 # Returns
 
 An `Atmosphere` instance built from reduced variables over the selected window.
-When `prepared.lazy == true`, results are memoized by `(step, spec, transforms)` and reused on repeated calls.
+When `prepared.lazy == true`, results are memoized by `(step, window, transforms)` and reused on repeated calls.
 """
 function sample_weather(
     prepared::PreparedWeather,
     step::Int;
-    spec::MeteoSamplingSpec=MeteoSamplingSpec(1.0, 0.0),
+    window::AbstractSamplingWindow=RollingWindow(1.0),
     transforms=nothing
 )
     rules = isnothing(transforms) ? prepared.transforms : normalize_sampling_transforms(transforms)
-    spec_sig = UInt64(hash((spec.dt, spec.phase, spec.window)))
+    window_sig = UInt64(hash(window))
     tr_sig = _transform_signature(rules)
-    key = (step, spec_sig, tr_sig)
+    key = (step, window_sig, tr_sig)
 
     if prepared.lazy && haskey(prepared.cache, key)
         return prepared.cache[key]
     end
 
-    sampled = _sample_weather_uncached(prepared, step, spec, rules)
+    sampled = _sample_weather_uncached(prepared, step, window, rules)
     if prepared.lazy
         prepared.cache[key] = sampled
     end
@@ -947,25 +925,25 @@ function sample_weather(
 end
 
 """
-    materialize_weather(prepared; specs, transforms=nothing)
+    materialize_weather(prepared; windows, transforms=nothing)
 
-Precompute sampled weather tables for a set of sampling specs.
-Returns `Dict{MeteoSamplingSpec,TimeStepTable{Atmosphere}}`.
+Precompute sampled weather tables for a set of sampling windows.
+Returns `Dict{AbstractSamplingWindow,TimeStepTable{Atmosphere}}`.
 
 # Arguments
 
 - `prepared::PreparedWeather`: sampler state containing source weather.
-- `specs`: iterable collection of [`MeteoSamplingSpec`](@ref).
-- `transforms`: optional transform override applied to all specs.
+- `windows`: iterable collection of [`AbstractSamplingWindow`](@ref).
+- `transforms`: optional transform override applied to all windows.
 """
-function materialize_weather(prepared::PreparedWeather; specs, transforms=nothing)
-    tables = Dict{MeteoSamplingSpec,TimeStepTable{Atmosphere}}()
-    for spec in specs
+function materialize_weather(prepared::PreparedWeather; windows, transforms=nothing)
+    tables = Dict{AbstractSamplingWindow,TimeStepTable{Atmosphere}}()
+    for window in windows
         rows = Atmosphere[
-            sample_weather(prepared, i; spec=spec, transforms=transforms)
+            sample_weather(prepared, i; window=window, transforms=transforms)
             for i in 1:length(prepared.weather)
         ]
-        tables[spec] = TimeStepTable(rows, metadata(prepared.weather))
+        tables[window] = TimeStepTable(rows, metadata(prepared.weather))
     end
     return tables
 end

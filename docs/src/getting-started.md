@@ -85,8 +85,8 @@ meteo_hourly = Weather([
 ])
 
 prepared = prepare_weather_sampler(meteo_hourly)
-spec = MeteoSamplingSpec(24.0)  # rolling 24-source-step window
-sampled = sample_weather(prepared, 24; spec = spec)
+window = RollingWindow(24.0)  # trailing 24-source-step window
+sampled = sample_weather(prepared, 24; window = window)
 
 # Get the temperature from the sampled row, which is a daily-averaged value of the 24 hourly source steps:
 (;sampled.duration, sampled.date, sampled.T)
@@ -101,11 +101,11 @@ mean(meteo_hourly[i].T for i in 1:24)
 
 ## 4. Precompute Sampling for Whole Runs
 
-Avoid repeated sampling work in long simulation loops, and get a cached sampled table for each requested sampling spec:
+Avoid repeated sampling work in long simulation loops, and get a cached sampled table for each requested sampling window:
 
 ```@example getting_started
-tables = materialize_weather(prepared; specs = [spec])
-daily_like = tables[spec]
+tables = materialize_weather(prepared; windows = [window])
+daily_like = tables[window]
 
 (length(daily_like), daily_like[24].T ≈ sampled.T, length(meteo_hourly))
 ```
@@ -121,7 +121,7 @@ custom_transforms = (
     Tsum = (source = :T, reducer = SumReducer())
 )
 
-custom_row = sample_weather(prepared, 24; spec = spec, transforms = custom_transforms)
+custom_row = sample_weather(prepared, 24; window = window, transforms = custom_transforms)
 (custom_row.T, custom_row.Tmax, custom_row.Tsum)
 ```
 
