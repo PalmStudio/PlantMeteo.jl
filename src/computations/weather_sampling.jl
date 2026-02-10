@@ -274,7 +274,7 @@ function CalendarWindow(
     period::Symbol;
     anchor::Symbol=:current_period,
     week_start::Int=1,
-    completeness::Symbol=:stict
+    completeness::Symbol=:strict
 )
     period in (:day, :week, :month) || error(
         "Unsupported calendar period `$(period)`. Allowed values are :day, :week, :month."
