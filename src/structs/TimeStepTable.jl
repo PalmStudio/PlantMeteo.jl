@@ -156,7 +156,7 @@ names(ts::TimeStepTable) = keys(ts)
 # matrix(ts::TimeStepTable) = reduce(hcat, [[i...] for i in ts])'
 
 function Tables.schema(m::TimeStepTable)
-    Tables.Schema([names(m)...], [typeof(i) for i in values(PlantMeteo.row_struct(m[1]))])
+    Tables.Schema([names(m)...], [typeof(i) for i in _get_field_values(PlantMeteo.row_struct(m[1]))])
 end
 
 Tables.materializer(::Type{TimeStepTable}) = TimeStepTable
@@ -168,6 +168,21 @@ function Tables.rows(t::TimeStepTable)
 end
 
 Base.eltype(::Type{TimeStepTable{T}}) where {T} = TimeStepRow{T}
+
+# Helper function to extract field values from a struct
+function _get_field_values(x)
+    # Try values() first (works for NamedTuples, Dicts, etc.)
+    if applicable(values, x)
+        val_iter = values(x)
+        # Check if the returned value is actually iterable
+        # (for structs, values() might just return the struct itself)
+        if val_iter !== x && Base.IteratorSize(val_iter) != Base.SizeUnknown()
+            return val_iter
+        end
+    end
+    # Fall back to iterating over fields
+    return (getfield(x, fn) for fn in fieldnames(typeof(x)))
+end
 
 function Base.length(A::TimeStepTable{T}) where {T}
     length(getfield(A, :ts))
@@ -366,7 +381,7 @@ function Base.show(io::IO, row::TimeStepRow)
 end
 
 
-function Base.:(==)(ts1::TimeStepTable{T}, ts2::TimeStepTable{T}) where {T}  
-    return (getfield(ts1,:names) == getfield(ts2,:names)) && 
-    (getfield(ts1,:metadata) == getfield(ts2, :metadata)) && (getfield(ts1,:ts) == getfield(ts2,:ts))
+function Base.:(==)(ts1::TimeStepTable{T}, ts2::TimeStepTable{T}) where {T}
+    return (getfield(ts1, :names) == getfield(ts2, :names)) &&
+           (getfield(ts1, :metadata) == getfield(ts2, :metadata)) && (getfield(ts1, :ts) == getfield(ts2, :ts))
 end
