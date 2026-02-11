@@ -40,22 +40,16 @@ w = get_weather(48.8566, 2.3522, period)
 w_daily = to_daily(w, :T => mean => :Tmean)
 ```
 """
-function to_daily(df::DataFrames.DataFrame, args...)
+function to_daily(df, args...)
+    Tables.istable(df) || throw(ArgumentError("`df` must implement the Tables.jl interface."))
+    cols = table_columns(df)
 
-    @assert hasproperty(df, :date) "The TimeStepTable must have a `date` column."
-
-    if !hasproperty(df, :year)
-        df.year = Dates.year.(df.date)
-    end
-
-    if !hasproperty(df, :dayofyear)
-        df.dayofyear = Dates.dayofyear.(df.date)
-    end
+    @assert hasproperty(cols, :date) "The TimeStepTable must have a `date` column."
 
     # Check that the durations in a day sum up to 24h (86400ms):
-    check_day_complete(df)
+    check_day_complete(cols)
 
-    def_trans = default_transformation(df)
+    def_trans = default_transformation(cols)
     def_trans_names = new_names(def_trans)
     user_trans_names = new_names(args)
 
@@ -65,18 +59,78 @@ function to_daily(df::DataFrames.DataFrame, args...)
         findall(x -> x in user_trans_names, def_trans_names)
     )
 
-    df = DataFrames.combine(
-        DataFrames.groupby(df, [:year, :dayofyear]),
-        def_trans...,
-        args...
-    )
+    years = hasproperty(cols, :year) ? cols.year : Dates.year.(cols.date)
+    dayofyear = hasproperty(cols, :dayofyear) ? cols.dayofyear : Dates.dayofyear.(cols.date)
+    groups, order = _group_by_day(years, dayofyear)
+    transformations = (def_trans..., args...)
 
-    return df
+    rows = [ _daily_row(cols, key, groups[key], transformations) for key in order ]
+
+    return TimeStepTable{Atmosphere}(rows, table_metadata(df))
 end
 
-function to_daily(t::T, args...) where {T<:TimeStepTable{<:Atmosphere}}
-    df = to_daily(DataFrames.DataFrame(t), args...)
-    return TimeStepTable{Atmosphere}(df, metadata(t))
+function _group_by_day(years, dayofyear)
+    groups = Dict{Tuple{Int,Int},Vector{Int}}()
+    order = Tuple{Int,Int}[]
+    for i in eachindex(years)
+        key = (years[i], dayofyear[i])
+        if !haskey(groups, key)
+            groups[key] = Int[]
+            push!(order, key)
+        end
+        push!(groups[key], i)
+    end
+    return groups, order
+end
+
+function _parse_daily_transformation(t)
+    t isa Pair || error("You should apply a transformation to the column to get a daily value.")
+    source = t.first
+
+    if t.second isa Pair
+        return source, t.second.first, t.second.second
+    elseif t.second isa Function
+        return source, t.second, Symbol(string(source, "_", t.second))
+    elseif t.second isa Symbol
+        return source, identity, t.second
+    else
+        error("The transformation must be a function or a symbol.")
+    end
+end
+
+function _subset_daily_columns(cols, source, idxs)
+    if source isa Symbol
+        return (Tables.getcolumn(cols, source)[idxs],)
+    end
+
+    (source isa AbstractVector || source isa Tuple) ||
+        error("The source columns should be a Symbol or a collection of Symbols.")
+    return Tuple(Tables.getcolumn(cols, s)[idxs] for s in source)
+end
+
+function _daily_transform_value(cols, idxs, source, fun)
+    values = fun(_subset_daily_columns(cols, source, idxs)...)
+
+    if values isa AbstractVector
+        length(values) == 1 ||
+            error("Daily transformations must return exactly one value per day.")
+        return values[1]
+    end
+
+    return values
+end
+
+function _daily_row(cols, key::Tuple{Int,Int}, idxs, transformations)
+    names = Symbol[:year, :dayofyear]
+    values = Any[key[1], key[2]]
+
+    for t in transformations
+        source, fun, new_name = _parse_daily_transformation(t)
+        push!(names, new_name)
+        push!(values, _daily_transform_value(cols, idxs, source, fun))
+    end
+
+    return NamedTuple{Tuple(names)}(Tuple(values))
 end
 
 """

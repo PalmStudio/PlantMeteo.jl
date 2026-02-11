@@ -39,11 +39,12 @@ function write_weather(
     duration=Dates.Minute
 )
     df = prepare_weather(w; vars=vars, duration=duration)
+    df = standardize_columns!(ToFileColumns(), df)
 
-    # Standardize the column names (e.g. :λ -> :lambda):
-    standardize_columns!(ToFileColumns(), df)
+    md = Dict{Symbol,Any}(pairs(table_metadata(w)))
+    md[:duration] = duration
 
-    write_weather_(file, df)
+    write_weather_(file, df; metadata_=(; md...))
 end
 
 """
@@ -88,13 +89,10 @@ function prepare_weather(
 )
     Tables.istable(w) || throw(ArgumentError("The weather data must be interfaced with `Tables.jl`."))
 
-    df = DataFrames.DataFrame(w)
-    df = select_weather(df, vars)
-    # add the duration format:
-    DataFrames.metadata!(df, "duration", duration, style=:note)
+    df = select_weather(w, vars)
 
     if hasproperty(df, :duration)
-        df.duration = Dates.value.(duration.(Dates.Millisecond.(Dates.toms.(w.duration))))
+        df = set_column(df, :duration, Dates.value.(duration.(Dates.Millisecond.(Dates.toms.(df.duration)))))
     end
 
     df
@@ -134,23 +132,29 @@ function select_weather(w, vars=setdiff(propertynames(w), ATMOSPHERE_COMPUTED))
 
     Tables.istable(w) || throw(ArgumentError("The weather data must be interfaced with `Tables.jl`."))
 
-    if vars !== nothing
-        vars_ = [vars...]
-        for var in vars
-            # check if the variables are in the table, if not remove them from the selection:
-            if !hasproperty(w, var)
-                popat!(vars_, findfirst(vars_ .== var))
-            else
-                # Remove variables with all values at Inf (default value, we don't need to write it)
-                if all(Tables.getcolumn(w, var) .== Inf)
-                    popat!(vars_, findfirst(vars_ .== var))
-                end
-            end
-        end
+    requested_vars = if vars === nothing
+        collect(propertynames(w))
+    else
+        collect(vars)
     end
 
-    # select the variables and return:
-    return DataFrames.select(DataFrames.DataFrame(w), vars_)
+    selected_vars = Symbol[]
+    selected_cols = Any[]
+
+    for var in requested_vars
+        hasproperty(w, var) || continue
+
+        col = Tables.getcolumn(w, var)
+        if vars !== nothing && all(==(Inf), col)
+            continue
+        end
+
+        push!(selected_vars, var)
+        push!(selected_cols, col)
+    end
+
+    # Build the table from selected columns only to avoid materializing all columns first.
+    return NamedTuple{Tuple(selected_vars)}(Tuple(selected_cols))
 end
 
 
@@ -159,24 +163,24 @@ end
 
 Write the weather data to a file with a special-commented yaml header for the metadata.
 """
-function write_weather_(file::String, w)
+function write_weather_(file::String, w; metadata_=NamedTuple())
 
-    if length(metadata(w)) > 0
+    if length(metadata_) > 0
         append = true
         # write the metadata as a (special-commented #') yaml header:
-        metadata_ = "#'"
-        for i in pairs(metadata(w))
+        metadata_string = "#'"
+        for i in pairs(metadata_)
             i.first == :file && continue # don't write the source file name as it is added at reading
             yaml_line = YAML.write(i)
             # NB: cannot simply use YAML.write(i, "#'") as it only puts the prefix on the first line (can make several lines out of one)
 
             # Add "#'" at the beginning of each line:
-            metadata_ *= replace(yaml_line, r"\n" => "\n#'")
+            metadata_string *= replace(yaml_line, r"\n" => "\n#'")
         end
-        metadata_ *= "\n"
+        metadata_string *= "\n"
 
         open(file, "w") do io
-            write(io, metadata_)
+            write(io, metadata_string)
         end
     else
         append = false

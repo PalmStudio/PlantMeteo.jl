@@ -59,16 +59,13 @@ function read_weather(
     data, metadata_ = read_weather_(file)
 
     # Apply the transformations eventually given by the user:
-    data = DataFrames.transform(
-        data,
-        arguments...
-    )
+    data = transform_columns(data, arguments...)
 
-    data.date = compute_date(data, date_format, hour_format)
-    data.duration = compute_duration(data, hour_format, duration)
+    data = set_column(data, :date, compute_date(data, date_format, hour_format))
+    data = set_column(data, :duration, compute_duration(data, hour_format, duration))
 
     # Rename the columns to the PlantMeteo convention (if any):
-    standardize_columns!(ToPlantMeteoColumns(), data)
+    data = standardize_columns!(ToPlantMeteoColumns(), data)
 
     # If there's a "use" field in the YAML, parse it and rename it:
     if haskey(metadata_, "use")
@@ -79,9 +76,20 @@ function read_weather(
             metadata_["use"] = Symbol.(splitted_use[findall(x -> length(x) > 0, splitted_use)])
         end
 
-        orig_names = [i.first for i in arguments]
-        new_names_ = [isa(i.second, Pair) ? i.second.second : i.second for i in arguments]
-        length(arguments) > 0 && replace!(metadata_["use"], Pair.(orig_names, new_names_)...)
+        replacements = Pair{Symbol,Symbol}[]
+        for i in arguments
+            i isa Pair || continue
+            new_name =
+                if i.second isa Pair
+                    i.second.second
+                elseif i.second isa Symbol
+                    i.second
+                else
+                    i.first
+                end
+            push!(replacements, i.first => new_name)
+        end
+        length(replacements) > 0 && replace!(metadata_["use"], replacements...)
     end
     # NB: the "use" field is not used in PlantMeteo, but it is still correctly parsed.
 
@@ -106,7 +114,7 @@ function read_weather_(file)
     metadata_ = length(yaml_data) > 0 ? YAML.load(yaml_data) : Dict()
     push!(metadata_, "file" => file)
 
-    met_data = CSV.read(file, DataFrames.DataFrame; comment="#")
+    met_data = Tables.columntable(CSV.File(file; comment="#"))
 
     (data=met_data, metadata_=metadata_)
 end

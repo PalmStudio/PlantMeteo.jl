@@ -2,7 +2,6 @@ module PlantMeteo
 
 import Dates
 import YAML, CSV
-import DataFrames
 import Statistics
 import Tables
 import Term, Crayons, PrettyTables # for pretty printing the TimeStepTable
@@ -15,6 +14,7 @@ include("computations/variables_computations.jl")
 include("computations/emissivity.jl")
 include("structs/atmosphere.jl")
 include("structs/TimeStepTable.jl")
+include("computations/table_utils.jl")
 include("computations/duration.jl")
 include("structs/weather.jl")
 include("variables.jl")
