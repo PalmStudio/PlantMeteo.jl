@@ -58,6 +58,16 @@ function TimeStepTable(ts, metadata=NamedTuple())
     TimeStepTable([i for i in Tables.namedtupleiterator(ts)], metadata)
 end
 
+# Shortcut for when the input is already a TimeStepTable:
+function TimeStepTable(ts::TS) where {TS<:TimeStepTable}
+    return ts
+end
+
+# Another shortcut for when the input is already a TimeStepTable with the same type parameter:
+function TimeStepTable{T}(ts::TimeStepTable{T}) where {T}
+    return ts
+end
+
 Tables.materializer(t::TimeStepTable{T}) where {T} = TimeStepTable{T}
 
 # DataAPI interface:
