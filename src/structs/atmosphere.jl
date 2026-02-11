@@ -51,6 +51,22 @@ struct Atmosphere{N,T<:Tuple} <: AbstractAtmosphere
 end
 
 function Atmosphere(;
+    T=nothing, Wind=nothing, Rh=nothing, kwargs...
+)
+    missing_required = Symbol[]
+    isnothing(T) && push!(missing_required, :T)
+    isnothing(Wind) && push!(missing_required, :Wind)
+    isnothing(Rh) && push!(missing_required, :Rh)
+    if !isempty(missing_required)
+        missing_str = join(("`$(name)`" for name in missing_required), ", ")
+        throw(ArgumentError("Missing mandatory Atmosphere keyword argument(s): $missing_str. Required keyword arguments are `T`, `Wind`, and `Rh`."))
+    end
+
+    return _build_atmosphere(; T=T, Wind=Wind, Rh=Rh, kwargs...)
+end
+
+# Builder, this is done after checking the required arguments because default values of the other arguments depend on the required ones:
+function _build_atmosphere(;
     T, Wind, Rh, date::D1=Dates.now(), duration=Dates.Second(1.0), P=DEFAULTS.P,
     Precipitations=DEFAULTS.Precipitations, Cₐ=DEFAULTS.Cₐ, check=true,
     e=vapor_pressure(T, Rh, check=check), eₛ=e_sat(T), VPD=eₛ - e, ρ=air_density(T, P, check=check),

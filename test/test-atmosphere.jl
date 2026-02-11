@@ -2,6 +2,10 @@
 @testset "Atmosphere structure" begin
     forced_date = Dates.DateTime("2021-09-15T16:24:00.929")
 
+    @test_throws "Missing mandatory Atmosphere keyword argument(s): `T`, `Wind`, `Rh`" Atmosphere()
+    @test_throws "Missing mandatory Atmosphere keyword argument(s): `Rh`" Atmosphere(T=25, Wind=5)
+    @test_throws "Missing mandatory Atmosphere keyword argument(s): `T`" Atmosphere(Wind=5, Rh=0.3)
+
     # Testing Atmosphere with some random values:
     @test NamedTuple(Atmosphere(date=forced_date, T=25, Wind=5, Rh=0.3)) ==
           NamedTuple{
