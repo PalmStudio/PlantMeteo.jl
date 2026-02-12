@@ -94,8 +94,51 @@ struct TimeStepRow{T} <: Tables.AbstractRow
     source::TimeStepTable{T}
 end
 
+struct TimeStepRows{S<:TimeStepTable}
+    source::S
+end
+
+struct TimeStepColumn{S<:TimeStepTable} <: AbstractVector{Any}
+    source::S
+    col_ind::Int
+end
+
 Base.parent(ts::TimeStepRow) = getfield(ts, :source)
 rownumber(ts::TimeStepRow) = getfield(ts, :row)
+Base.parent(ts::TimeStepRows) = getfield(ts, :source)
+
+Base.length(rows::TimeStepRows) = length(parent(rows))
+Base.IteratorSize(::Type{<:TimeStepRows}) = Base.HasLength()
+
+@inline function Base.getindex(rows::TimeStepRows, i::Int)
+    @boundscheck if i < 1 || i > length(rows)
+        throw(BoundsError(parent(rows), i))
+    end
+    return TimeStepRow(i, parent(rows))
+end
+
+Base.iterate(rows::TimeStepRows, st=1) =
+    st > length(rows) ? nothing : (TimeStepRow(st, parent(rows)), st + 1)
+
+Base.length(col::TimeStepColumn) = length(getfield(col, :source))
+Base.size(col::TimeStepColumn) = (length(col),)
+Base.axes(col::TimeStepColumn) = (Base.OneTo(length(col)),)
+Base.IndexStyle(::Type{<:TimeStepColumn}) = IndexLinear()
+
+@inline _row_get_value(row::AbstractDict, ::Int, col_name::Symbol) = row[col_name]
+@inline _row_get_value(row, col_ind::Int, ::Symbol) = row[col_ind]
+
+@inline function Base.getindex(col::TimeStepColumn, i::Int)
+    ts = getfield(col, :source)
+    col_ind = getfield(col, :col_ind)
+    @boundscheck if i < 1 || i > length(ts)
+        throw(BoundsError(col, i))
+    end
+
+    row = @inbounds getfield(ts, :ts)[i]
+    col_name = @inbounds getfield(ts, :names)[col_ind]
+    return @inbounds _row_get_value(row, col_ind, col_name)
+end
 
 # Defining the generic implementation of row_from_parent:
 row_from_parent(row, i) = Tables.rows(parent(row))[i]
@@ -105,7 +148,8 @@ row_from_parent(row::TimeStepRow, i) = parent(row)[i]
 
 function Base.getindex(row::TimeStepRow{T}, i::Int) where {T<:AbstractDict}
     ts = parent(row)
-    getindex(ts[rownumber(row)], names(ts)[i])
+    raw_row = getfield(ts, :ts)[rownumber(row)]
+    getindex(raw_row, getfield(ts, :names)[i])
 end
 
 """
@@ -174,7 +218,20 @@ Tables.materializer(::Type{TimeStepTable}) = TimeStepTable
 Tables.rowaccess(::Type{<:TimeStepTable}) = true
 
 function Tables.rows(t::TimeStepTable)
-    return [TimeStepRow(i, t) for i in 1:length(t)]
+    return TimeStepRows(t)
+end
+
+@inline function Tables.getcolumn(ts::TimeStepTable, col_ind::Int)
+    @boundscheck if col_ind < 1 || col_ind > length(getfield(ts, :names))
+        throw(BoundsError(ts, (:, col_ind)))
+    end
+    return TimeStepColumn(ts, col_ind)
+end
+
+@inline function Tables.getcolumn(ts::TimeStepTable, col_name::Symbol)
+    col_ind = findfirst(==(col_name), getfield(ts, :names))
+    isnothing(col_ind) && throw(ArgumentError("Column $col_name does not exist in the table."))
+    return TimeStepColumn(ts, col_ind)
 end
 
 Base.eltype(::Type{TimeStepTable{T}}) where {T} = TimeStepRow{T}
@@ -285,7 +342,6 @@ function Base.setproperty!(ts::TimeStepTable, s::Symbol, x)
 end
 
 @inline function Base.getindex(ts::TimeStepTable, row_ind::Integer, col_ind::Integer)
-    rows = Tables.rows(ts)
     @boundscheck begin
         if col_ind < 1 || col_ind > length(keys(ts))
             throw(BoundsError(ts, (row_ind, col_ind)))
@@ -294,19 +350,20 @@ end
             throw(BoundsError(ts, (row_ind, col_ind)))
         end
     end
-    return @inbounds rows[row_ind][col_ind]
+    row = @inbounds getfield(ts, :ts)[row_ind]
+    col_name = @inbounds getfield(ts, :names)[col_ind]
+    return @inbounds _row_get_value(row, col_ind, col_name)
 end
 
 # Indexing a TimeStepTable in one dimension only gives the row (e.g. `ts[1] == ts[1,:]`)
 @inline function Base.getindex(ts::TimeStepTable, i::Integer)
-    rows = Tables.rows(ts)
     @boundscheck begin
         if i < 1 || i > length(ts)
             throw(BoundsError(ts, i))
         end
     end
 
-    return @inbounds rows[i]
+    return TimeStepRow(i, ts)
 end
 
 """

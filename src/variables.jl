@@ -29,6 +29,7 @@ The reverse procedure is done when reading a file with [`read_weather`](@ref).
 const ATMOSPHERE_NONSTANDARD_NAMES = (
     Cₐ=:Ca, eₛ=:es, ρ=:rho, λ=:lambda, γ=:gamma, ε=:epsilon, Δ=:Delta
 )
+const ATMOSPHERE_STANDARD_TO_INTERNAL = (; (v => k for (k, v) in pairs(ATMOSPHERE_NONSTANDARD_NAMES))...)
 
 struct ToFileColumns end
 struct ToPlantMeteoColumns end
@@ -64,29 +65,13 @@ df = standardize_columns!(ToFileColumns(), df)
 ```
 """
 function standardize_columns!(::ToFileColumns, df)
-    to_rename = Pair{Symbol,Symbol}[]
-
-    # if the variable is in the list of non-standard names, add it to the renaming vector of pairs:
-    for var in propertynames(df)
-        if var in keys(ATMOSPHERE_NONSTANDARD_NAMES)
-            push!(to_rename, var => ATMOSPHERE_NONSTANDARD_NAMES[var])
-        end
-    end
-
-    # rename the variables:
-    length(to_rename) > 0 && DataFrames.rename!(df, to_rename)
+    rename_columns(df, var -> begin
+        haskey(ATMOSPHERE_NONSTANDARD_NAMES, var) ? ATMOSPHERE_NONSTANDARD_NAMES[var] : var
+    end)
 end
 
 function standardize_columns!(::ToPlantMeteoColumns, df)
-    to_rename = Pair{Symbol,Symbol}[]
-
-    # if the variable is in the list of PlantMeteo variables, add it to the renaming vector of pairs:
-    for var in propertynames(df)
-        if var in ATMOSPHERE_NONSTANDARD_NAMES
-            push!(to_rename, var => findfirst(x -> x == var, ATMOSPHERE_NONSTANDARD_NAMES))
-        end
-    end
-
-    # rename the variables:
-    length(to_rename) > 0 && DataFrames.rename!(df, to_rename)
+    rename_columns(df, var -> begin
+        haskey(ATMOSPHERE_STANDARD_TO_INTERNAL, var) ? ATMOSPHERE_STANDARD_TO_INTERNAL[var] : var
+    end)
 end
