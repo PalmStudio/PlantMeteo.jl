@@ -459,7 +459,8 @@ function Base.append!(ts::TimeStepTable, x)
     append!(getfield(ts, :ts), x)
 end
 
-function Base.show(io::IO, t::TimeStepTable{T}) where {T}
+
+function show_ts(t::TimeStepTable{T}, io, io_type) where {T}
     length(t) == 0 && return
 
     T_string = string(T)
@@ -467,23 +468,53 @@ function Base.show(io::IO, t::TimeStepTable{T}) where {T}
         T_string = string(T_string[1:prevind(T_string, 30)], "...")
     end
 
-    print(
-        io,
-        "TimeStepTable{$(T_string)}($(length(t)) x $(length(getfield(t,:names)))):\n"
-    )
+    if io_type == :html
+        t_format = PrettyTables.HtmlTableFormat()
+        t_style = PrettyTables.HtmlTableStyle()
+    elseif io_type == :latex
+        t_format = PrettyTables.LatexTableFormat()
+        t_style = PrettyTables.LatexTableStyle()
+    elseif io_type == :markdown
+        t_format = PrettyTables.MarkdownTableFormat()
+        t_style = PrettyTables.MarkdownTableStyle()
+    else
+        t_format = PrettyTables.TextTableFormat(borders=PrettyTables.text_table_borders__unicode_rounded)
+        t_style = PrettyTables.TextTableStyle(; table_border=Crayons.crayon"red")
+    end
 
     PrettyTables.pretty_table(
-        io, t,
-        tf=PrettyTables.tf_unicode_rounded,
-        border_crayon=Crayons.crayon"red",
-        show_row_number=true,
-        row_label_column_title="Step"
+        io, t; backend=io_type,
+        title="TimeStepTable{$(T_string)}($(length(t)) x $(length(getfield(t,:names)))):",
+        table_format=t_format,
+        row_number_column_label="Step",
+        row_labels=1:length(t),
+        vertical_crop_mode=:middle,
+        style=t_style,
     )
 
     if length(metadata(t)) > 0
         print(io, "Metadata: `$(metadata(t))`")
     end
 end
+
+
+function Base.show(io::IO, ::MIME"text/plain", t::TimeStepTable{T}) where {T}
+    show_ts(t, io, :text)
+end
+
+
+function Base.show(io::IO, ::MIME"text/html", t::TimeStepTable{T}) where {T}
+    show_ts(t, io, :html)
+end
+
+function Base.show(io::IO, ::MIME"text/markdown", t::TimeStepTable{T}) where {T}
+    show_ts(t, io, :markdown)
+end
+
+function Base.show(io::IO, ::MIME"text/latex", t::TimeStepTable{T}) where {T}
+    show_ts(t, io, :latex)
+end
+
 
 
 function Base.show(io::IO, row::TimeStepRow)
