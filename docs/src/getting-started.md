@@ -65,15 +65,15 @@ meteo.T
 `TimeStepTable` also supports matrix-like indexing on rows and columns:
 
 ```@example getting_started
-data[:T]      # full column by Symbol
-data["T"]     # full column by String
-data[1]       # one row
-data[1:2]     # row subset as TimeStepTable
-data[1, :]    # one row (matrix-like syntax)
-data[1, :T]   # one cell by row + Symbol column
-data[1, "T"]  # one cell by row + String column
-data[1:2, :T] # vector slice from one column
-data[1:2, "T"]
+meteo[:T]      # full column by Symbol
+meteo["T"]     # full column by String
+meteo[1]       # one row
+meteo[1:2]     # row subset as TimeStepTable
+meteo[1, :]    # one row (matrix-like syntax)
+meteo[1, :T]   # one cell by row + Symbol column
+meteo[1, "T"]  # one cell by row + String column
+meteo[1:2, :T] # vector slice from one column
+meteo[1:2, "T"]
 ```
 
 ## 3. Sample Weather to Match a Model Time Step
