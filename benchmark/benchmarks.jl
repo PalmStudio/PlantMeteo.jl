@@ -1,7 +1,3 @@
-using Pkg
-Pkg.activate(dirname(@__FILE__))
-Pkg.instantiate()
-
 using BenchmarkTools
 using Dates
 using PlantMeteo
