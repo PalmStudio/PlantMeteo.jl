@@ -49,12 +49,19 @@ for row_type in row_types
         @test ts[1:2] == ts
         @test ts[1:2, :] isa TimeStepTable
         @test ts[1:2, :] == ts
+        @test ts[1, :T] == ref_values.T
+        @test ts[1, "T"] == ref_values.T
+        @test ts[1:2, :T] == [ref_values.T, ref_values.T]
+        @test ts[1:2, "T"] == [ref_values.T, ref_values.T]
+        @test ts[:, :T] == ts.T
+        @test ts[:, "T"] == ts.T
         @test PlantMeteo.row_struct(ts[[2, 1]][1, :]) == PlantMeteo.row_struct(ts[2, :])
         @test PlantMeteo.row_struct(ts[[2, 1]][2, :]) == PlantMeteo.row_struct(ts[1, :])
         @test length(ts[1:0]) == 0
         @test length(ts[1:0, :]) == 0
         @test_throws BoundsError ts[1:3]
         @test_throws BoundsError ts[1:3, :]
+        @test_throws ArgumentError ts[1, :DOES_NOT_EXIST]
 
         # Get column names:
         @test Tables.columnnames(ts) == (keys(row_type)...,)

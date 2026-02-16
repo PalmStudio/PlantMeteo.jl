@@ -62,6 +62,20 @@ For example to get the temperature column as a vector:
 meteo.T
 ```
 
+`TimeStepTable` also supports matrix-like indexing on rows and columns:
+
+```@example getting_started
+data[:T]      # full column by Symbol
+data["T"]     # full column by String
+data[1]       # one row
+data[1:2]     # row subset as TimeStepTable
+data[1, :]    # one row (matrix-like syntax)
+data[1, :T]   # one cell by row + Symbol column
+data[1, "T"]  # one cell by row + String column
+data[1:2, :T] # vector slice from one column
+data[1:2, "T"]
+```
+
 ## 3. Sample Weather to Match a Model Time Step
 
 Sometimes models require weather at a coarser time step than the source data. For example, you may have hourly weather but want daily values for a crop model. PlantMeteo's sampling functions let you aggregate weather from source resolution to model resolution, and get an aggregated `Atmosphere` row per query step.

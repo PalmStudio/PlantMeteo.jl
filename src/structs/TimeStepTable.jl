@@ -33,6 +33,17 @@ TimeStepTable(df)
 # specify it as a type parameter (if you want *e.g.* mutability or pre-computations):
 TimeStepTable{Atmosphere}(df)
 # Or if you use PlantSimEngine: TimeStepTable{Status}(df)
+
+# Indexing examples:
+data[:T]      # full column by Symbol
+data["T"]     # full column by String
+data[1]       # one row
+data[1:2]     # row subset as TimeStepTable
+data[1, :]    # one row (matrix-like syntax)
+data[1, :T]   # one cell by row + Symbol column
+data[1, "T"]  # one cell by row + String column
+data[1:2, :T] # vector slice from one column
+data[1:2, "T"]
 ```
 """
 struct TimeStepTable{T}
@@ -322,12 +333,17 @@ function Base.getindex(ts::TimeStepTable, index::Symbol)
     getproperty(ts, index)
 end
 
-function Base.getindex(ts::TimeStepTable, index)
+function Base.getindex(ts::TimeStepTable, index::AbstractString)
     getproperty(ts, Symbol(index))
 end
 
 # Indexing with a vector/range of rows returns a TimeStepTable subset.
 @inline function Base.getindex(ts::TimeStepTable, row_inds::AbstractVector{<:Integer})
+    rows = getfield(ts, :ts)[row_inds]
+    TimeStepTable(getfield(ts, :names), getfield(ts, :metadata), rows)
+end
+
+@inline function Base.getindex(ts::TimeStepTable, row_inds::AbstractRange{<:Integer})
     rows = getfield(ts, :ts)[row_inds]
     TimeStepTable(getfield(ts, :names), getfield(ts, :metadata), rows)
 end
@@ -353,6 +369,16 @@ end
     row = @inbounds getfield(ts, :ts)[row_ind]
     col_name = @inbounds getfield(ts, :names)[col_ind]
     return @inbounds _row_get_value(row, col_ind, col_name)
+end
+
+@inline function Base.getindex(ts::TimeStepTable, row_ind::Integer, col_ind::Symbol)
+    col_i = findfirst(==(col_ind), getfield(ts, :names))
+    isnothing(col_i) && throw(ArgumentError("Column $col_ind does not exist in the table."))
+    return getindex(ts, row_ind, col_i)
+end
+
+@inline function Base.getindex(ts::TimeStepTable, row_ind::Integer, col_ind::AbstractString)
+    return getindex(ts, row_ind, Symbol(col_ind))
 end
 
 # Indexing a TimeStepTable in one dimension only gives the row (e.g. `ts[1] == ts[1,:]`)
@@ -391,9 +417,37 @@ end
     return getindex(ts, row_inds)
 end
 
+@inline function Base.getindex(ts::TimeStepTable, row_inds::AbstractRange{<:Integer}, ::Colon)
+    return getindex(ts, row_inds)
+end
+
 # Indexing a TimeStepTable with a colon (e.g. `ts[:,1]`) gives all values in the row.
 @inline function Base.getindex(ts::TimeStepTable, ::Colon, col_ind::Integer)
     return getproperty(Tables.columns(ts), col_ind)
+end
+
+@inline function Base.getindex(ts::TimeStepTable, ::Colon, col_ind::Symbol)
+    return getproperty(ts, col_ind)
+end
+
+@inline function Base.getindex(ts::TimeStepTable, ::Colon, col_ind::AbstractString)
+    return getindex(ts, :, Symbol(col_ind))
+end
+
+@inline function Base.getindex(ts::TimeStepTable, row_inds::AbstractVector{<:Integer}, col_ind::Symbol)
+    return getindex(ts, :, col_ind)[row_inds]
+end
+
+@inline function Base.getindex(ts::TimeStepTable, row_inds::AbstractVector{<:Integer}, col_ind::AbstractString)
+    return getindex(ts, row_inds, Symbol(col_ind))
+end
+
+@inline function Base.getindex(ts::TimeStepTable, row_inds::AbstractRange{<:Integer}, col_ind::Symbol)
+    return getindex(ts, :, col_ind)[row_inds]
+end
+
+@inline function Base.getindex(ts::TimeStepTable, row_inds::AbstractRange{<:Integer}, col_ind::AbstractString)
+    return getindex(ts, row_inds, Symbol(col_ind))
 end
 
 # Pushing and appending to a TimeStepTable object:
