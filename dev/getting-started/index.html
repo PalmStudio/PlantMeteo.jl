@@ -13,17 +13,176 @@ meteo = read_weather(
     date_format = DateFormat(&quot;yyyy/mm/dd&quot;)
 )
 
-meteo</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">TimeStepTable{Atmosphere{(:date, :duration,...}(3 x 29):
-<span class="sgr31">╭─────┬─────────────────────┬──────────────────────┬─────────┬─────────┬────────</span>
-<span class="sgr31">│</span><span class="sgr1"> Row </span><span class="sgr31">│</span><span class="sgr1">                date </span><span class="sgr31">│</span><span class="sgr1">             duration </span><span class="sgr31">│</span><span class="sgr1">       T </span><span class="sgr31">│</span><span class="sgr1">    Wind </span><span class="sgr31">│</span><span class="sgr1">      </span> ⋯
-<span class="sgr31">│</span>     <span class="sgr31">│</span><span class="sgr90">            DateTime </span><span class="sgr31">│</span><span class="sgr90"> Dates.CompoundPeriod </span><span class="sgr31">│</span><span class="sgr90"> Float64 </span><span class="sgr31">│</span><span class="sgr90"> Float64 </span><span class="sgr31">│</span><span class="sgr90"> Float</span> ⋯
-<span class="sgr31">├─────┼─────────────────────┼──────────────────────┼─────────┼─────────┼────────</span>
-<span class="sgr31">│</span>   1 <span class="sgr31">│</span> 2016-06-12T12:00:00 <span class="sgr31">│</span>           30 minutes <span class="sgr31">│</span>    25.0 <span class="sgr31">│</span>     1.0 <span class="sgr31">│</span> 101.3 ⋯
-<span class="sgr31">│</span>   2 <span class="sgr31">│</span> 2016-06-12T12:30:00 <span class="sgr31">│</span>           30 minutes <span class="sgr31">│</span>    26.0 <span class="sgr31">│</span>     1.5 <span class="sgr31">│</span> 101.3 ⋯
-<span class="sgr31">│</span>   3 <span class="sgr31">│</span> 2016-06-12T13:00:00 <span class="sgr31">│</span>           30 minutes <span class="sgr31">│</span>    25.3 <span class="sgr31">│</span>     1.5 <span class="sgr31">│</span> 101.3 ⋯
-<span class="sgr31">╰─────┴─────────────────────┴──────────────────────┴─────────┴─────────┴────────</span>
-<span class="sgr36">                                                              25 columns omitted</span>
-Metadata: `Dict{String, Any}(&quot;name&quot; =&gt; &quot;Aquiares&quot;, &quot;latitude&quot; =&gt; 15.0, &quot;altitude&quot; =&gt; 100.0, &quot;use&quot; =&gt; [:clearness], &quot;file&quot; =&gt; &quot;/home/runner/work/PlantMeteo.jl/PlantMeteo.jl/test/data/meteo.csv&quot;)`</code></pre><h2 id="2.-Inspect-the-Data-You-Will-Feed-to-Models"><a class="docs-heading-anchor" href="#2.-Inspect-the-Data-You-Will-Feed-to-Models">2. Inspect the Data You Will Feed to Models</a><a id="2.-Inspect-the-Data-You-Will-Feed-to-Models-1"></a><a class="docs-heading-anchor-permalink" href="#2.-Inspect-the-Data-You-Will-Feed-to-Models" title="Permalink"></a></h2><p>Each row is an <code>Atmosphere</code>. You can get a row by indexing the table with a single index:</p><pre><code class="language-julia hljs">first_row = meteo[1]
+meteo</code></pre><table>
+  <thead>
+    <tr class = "title">
+      <td colspan = "30" style = "font-size: x-large; font-weight: bold; text-align: center;">TimeStepTable{Atmosphere{(:date, :duration,...}(3 x 29):</td>
+    </tr>
+    <tr class = "columnLabelRow">
+      <th class = "stubheadLabel" style = "font-weight: bold; text-align: right;"></th>
+      <th style = "font-weight: bold; text-align: right;">date</th>
+      <th style = "font-weight: bold; text-align: right;">duration</th>
+      <th style = "font-weight: bold; text-align: right;">T</th>
+      <th style = "font-weight: bold; text-align: right;">Wind</th>
+      <th style = "font-weight: bold; text-align: right;">P</th>
+      <th style = "font-weight: bold; text-align: right;">Rh</th>
+      <th style = "font-weight: bold; text-align: right;">Precipitations</th>
+      <th style = "font-weight: bold; text-align: right;">Cₐ</th>
+      <th style = "font-weight: bold; text-align: right;">e</th>
+      <th style = "font-weight: bold; text-align: right;">eₛ</th>
+      <th style = "font-weight: bold; text-align: right;">VPD</th>
+      <th style = "font-weight: bold; text-align: right;">ρ</th>
+      <th style = "font-weight: bold; text-align: right;">λ</th>
+      <th style = "font-weight: bold; text-align: right;">γ</th>
+      <th style = "font-weight: bold; text-align: right;">ε</th>
+      <th style = "font-weight: bold; text-align: right;">Δ</th>
+      <th style = "font-weight: bold; text-align: right;">clearness</th>
+      <th style = "font-weight: bold; text-align: right;">Ri_SW_f</th>
+      <th style = "font-weight: bold; text-align: right;">Ri_PAR_f</th>
+      <th style = "font-weight: bold; text-align: right;">Ri_NIR_f</th>
+      <th style = "font-weight: bold; text-align: right;">Ri_TIR_f</th>
+      <th style = "font-weight: bold; text-align: right;">Ri_custom_f</th>
+      <th style = "font-weight: bold; text-align: right;">hour_start</th>
+      <th style = "font-weight: bold; text-align: right;">hour_end</th>
+      <th style = "font-weight: bold; text-align: right;">temperature</th>
+      <th style = "font-weight: bold; text-align: right;">relativeHumidity</th>
+      <th style = "font-weight: bold; text-align: right;">Re_SW_f</th>
+      <th style = "font-weight: bold; text-align: right;">wind</th>
+      <th style = "font-weight: bold; text-align: right;">atmosphereCO2_ppm</th>
+    </tr>
+    <tr class = "columnLabelRow">
+      <th class = "stubheadLabel" style = "font-weight: bold; text-align: right;"></th>
+      <th style = "text-align: right;">DateTime</th>
+      <th style = "text-align: right;">Dates.CompoundPeriod</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Time</th>
+      <th style = "text-align: right;">Time</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">1</td>
+      <td style = "text-align: right;">2016-06-12T12:00:00</td>
+      <td style = "text-align: right;">30 minutes</td>
+      <td style = "text-align: right;">25.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">101.325</td>
+      <td style = "text-align: right;">0.6</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">380.0</td>
+      <td style = "text-align: right;">1.90812</td>
+      <td style = "text-align: right;">3.1802</td>
+      <td style = "text-align: right;">1.27208</td>
+      <td style = "text-align: right;">1.18389</td>
+      <td style = "text-align: right;">2.44188e6</td>
+      <td style = "text-align: right;">0.0675791</td>
+      <td style = "text-align: right;">0.602345</td>
+      <td style = "text-align: right;">0.190095</td>
+      <td style = "text-align: right;">0.75</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">12:00:00</td>
+      <td style = "text-align: right;">12:30:00</td>
+      <td style = "text-align: right;">25.0</td>
+      <td style = "text-align: right;">60.0</td>
+      <td style = "text-align: right;">500.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">380.0</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">2</td>
+      <td style = "text-align: right;">2016-06-12T12:30:00</td>
+      <td style = "text-align: right;">30 minutes</td>
+      <td style = "text-align: right;">26.0</td>
+      <td style = "text-align: right;">1.5</td>
+      <td style = "text-align: right;">101.325</td>
+      <td style = "text-align: right;">0.62</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">380.0</td>
+      <td style = "text-align: right;">2.09238</td>
+      <td style = "text-align: right;">3.37481</td>
+      <td style = "text-align: right;">1.28243</td>
+      <td style = "text-align: right;">1.17993</td>
+      <td style = "text-align: right;">2.43951e6</td>
+      <td style = "text-align: right;">0.0676446</td>
+      <td style = "text-align: right;">0.610038</td>
+      <td style = "text-align: right;">0.200215</td>
+      <td style = "text-align: right;">0.75</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">12:30:00</td>
+      <td style = "text-align: right;">13:00:00</td>
+      <td style = "text-align: right;">26.0</td>
+      <td style = "text-align: right;">62.0</td>
+      <td style = "text-align: right;">500.0</td>
+      <td style = "text-align: right;">1.5</td>
+      <td style = "text-align: right;">380.0</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">3</td>
+      <td style = "text-align: right;">2016-06-12T13:00:00</td>
+      <td style = "text-align: right;">30 minutes</td>
+      <td style = "text-align: right;">25.3</td>
+      <td style = "text-align: right;">1.5</td>
+      <td style = "text-align: right;">101.325</td>
+      <td style = "text-align: right;">0.58</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">380.0</td>
+      <td style = "text-align: right;">1.87776</td>
+      <td style = "text-align: right;">3.23752</td>
+      <td style = "text-align: right;">1.35976</td>
+      <td style = "text-align: right;">1.1827</td>
+      <td style = "text-align: right;">2.44117e6</td>
+      <td style = "text-align: right;">0.0675987</td>
+      <td style = "text-align: right;">0.60088</td>
+      <td style = "text-align: right;">0.193085</td>
+      <td style = "text-align: right;">0.75</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">13:00:00</td>
+      <td style = "text-align: right;">13:30:00</td>
+      <td style = "text-align: right;">25.3</td>
+      <td style = "text-align: right;">58.0</td>
+      <td style = "text-align: right;">500.0</td>
+      <td style = "text-align: right;">1.5</td>
+      <td style = "text-align: right;">380.0</td>
+    </tr>
+  </tbody>
+</table>
+Metadata: `Dict{String, Any}("name" => "Aquiares", "latitude" => 15.0, "altitude" => 100.0, "use" => [:clearness], "file" => "/home/runner/work/PlantMeteo.jl/PlantMeteo.jl/test/data/meteo.csv")`<h2 id="2.-Inspect-the-Data-You-Will-Feed-to-Models"><a class="docs-heading-anchor" href="#2.-Inspect-the-Data-You-Will-Feed-to-Models">2. Inspect the Data You Will Feed to Models</a><a id="2.-Inspect-the-Data-You-Will-Feed-to-Models-1"></a><a class="docs-heading-anchor-permalink" href="#2.-Inspect-the-Data-You-Will-Feed-to-Models" title="Permalink"></a></h2><p>Each row is an <code>Atmosphere</code>. You can get a row by indexing the table with a single index:</p><pre><code class="language-julia hljs">first_row = meteo[1]
 first_row</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi"><span class="sgr31">╭──── </span>TimeStepRow<span class="sgr31"> ─────────────────────────────────────────────────────────────╮</span>
 <span class="sgr31">│</span>  Step 1: date=2016-06-12T12:00:00, duration=30 minutes, T=25.0, Wind=1.0,    <span class="sgr31">│</span>
 <span class="sgr31">│</span>  P=101.325, Rh=0.6, Precipitations=0.0, Cₐ=380.0, e=1.9081174488870076,      <span class="sgr31">│</span>
@@ -72,4 +231,4 @@ daily_like = tables[window]
 )
 
 custom_row = sample_weather(prepared, 24; window = window, transforms = custom_transforms)
-(custom_row.T, custom_row.Tmax, custom_row.Tsum)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(21.5, 33.0, 516.0)</code></pre><h2 id="Next-Steps"><a class="docs-heading-anchor" href="#Next-Steps">Next Steps</a><a id="Next-Steps-1"></a><a class="docs-heading-anchor-permalink" href="#Next-Steps" title="Permalink"></a></h2><ul><li><a href="../weather-apis/">Weather Data Sources</a>: deeper look at file/API ingestion and export.</li><li><a href="../weather-sampling/">Weather Sampling</a>: windows, reducers, transforms, and caching strategy.</li><li><a href="../API/">API</a>: full reference for all exported symbols.</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../weather-apis/">Weather Data Sources »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Monday 16 February 2026 16:48">Monday 16 February 2026</span>. Using Julia version 1.8.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+(custom_row.T, custom_row.Tmax, custom_row.Tsum)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(21.5, 33.0, 516.0)</code></pre><h2 id="Next-Steps"><a class="docs-heading-anchor" href="#Next-Steps">Next Steps</a><a id="Next-Steps-1"></a><a class="docs-heading-anchor-permalink" href="#Next-Steps" title="Permalink"></a></h2><ul><li><a href="../weather-apis/">Weather Data Sources</a>: deeper look at file/API ingestion and export.</li><li><a href="../weather-sampling/">Weather Sampling</a>: windows, reducers, transforms, and caching strategy.</li><li><a href="../API/">API</a>: full reference for all exported symbols.</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../weather-apis/">Weather Data Sources »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Monday 16 February 2026 18:43">Monday 16 February 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
