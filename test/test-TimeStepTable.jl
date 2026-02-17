@@ -78,3 +78,18 @@ for row_type in row_types
         @test names(df) == [string.(keys(row_type))...]
     end
 end
+
+@testset "TimeStepTable schema inference" begin
+    ts_mixed = TimeStepTable([(A=nothing, B=1), (A=1.0, B=2)])
+    sch_mixed = Tables.schema(ts_mixed)
+    @test sch_mixed.names == (:A, :B)
+    @test sch_mixed.types == (Union{Nothing,Float64}, Int64)
+
+    ts_num = TimeStepTable([(A=1,), (A=2.0,)])
+    sch_num = Tables.schema(ts_num)
+    @test sch_num.names == (:A,)
+    @test sch_num.types == (Union{Int64,Float64},)
+
+    df_mixed = DataFrame(ts_mixed)
+    @test eltype(df_mixed.A) == Union{Nothing,Float64}
+end

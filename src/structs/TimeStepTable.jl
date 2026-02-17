@@ -221,7 +221,7 @@ names(ts::TimeStepTable) = keys(ts)
 # matrix(ts::TimeStepTable) = reduce(hcat, [[i...] for i in ts])'
 
 function Tables.schema(m::TimeStepTable)
-    Tables.Schema([names(m)...], [typeof(i) for i in _get_field_values(PlantMeteo.row_struct(m[1]))])
+    Tables.Schema(getfield(m, :names), infer_schema_types(m))
 end
 
 Tables.materializer(::Type{TimeStepTable}) = TimeStepTable
@@ -247,19 +247,36 @@ end
 
 Base.eltype(::Type{TimeStepTable{T}}) where {T} = TimeStepRow{T}
 
-# Helper function to extract field values from a struct
-function _get_field_values(x)
-    # Try values() first (works for NamedTuples, Dicts, etc.)
-    if applicable(values, x)
-        val_iter = values(x)
-        # Check if the returned value is actually iterable
-        # (for structs, values() might just return the struct itself)
-        if val_iter !== x && Base.IteratorSize(val_iter) != Base.SizeUnknown()
-            return val_iter
+@inline function merge_schema_types(t1::Type, t2::Type)
+    t1 === t2 && return t1
+    t2 <: t1 && return t1
+    t1 <: t2 && return t2
+    return Union{t1,t2}
+end
+
+function infer_schema_types(ts::TimeStepTable)
+    col_names = getfield(ts, :names)
+    ncols = length(col_names)
+    nrows = length(ts)
+    nrows == 0 && return fill(Any, ncols)
+
+    rows = getfield(ts, :ts)
+    types = Vector{Type}(undef, ncols)
+
+    first_row = @inbounds rows[1]
+    @inbounds for col_ind in 1:ncols
+        types[col_ind] = typeof(_row_get_value(first_row, col_ind, col_names[col_ind]))
+    end
+
+    @inbounds for row_ind in 2:nrows
+        row = rows[row_ind]
+        for col_ind in 1:ncols
+            val_type = typeof(_row_get_value(row, col_ind, col_names[col_ind]))
+            types[col_ind] = merge_schema_types(types[col_ind], val_type)
         end
     end
-    # Fall back to iterating over fields
-    return (getfield(x, fn) for fn in fieldnames(typeof(x)))
+
+    return types
 end
 
 function Base.length(A::TimeStepTable{T}) where {T}
