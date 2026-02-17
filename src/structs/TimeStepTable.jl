@@ -295,7 +295,36 @@ function infer_schema_types(ts::TimeStepTable)
 end
 
 @inline function invalidate_schema_cache!(ts::TimeStepTable)
-    getfield(ts, :schema_cache)[] = nothing
+    cache_ref = getfield(ts, :schema_cache)
+    if !isnothing(cache_ref[])
+        cache_ref[] = nothing
+    end
+    return ts
+end
+
+function update_schema_cache_for_new_rows!(ts::TimeStepTable, new_rows)
+    cache_ref = getfield(ts, :schema_cache)
+    cached = cache_ref[]
+    isnothing(cached) && return ts
+
+    col_names = getfield(ts, :names)
+    types = Type[cached.types...]
+    changed = false
+
+    for row in new_rows
+        for col_ind in eachindex(col_names)
+            val_type = typeof(_row_get_value(row, col_ind, col_names[col_ind]))
+            merged = merge_schema_types(types[col_ind], val_type)
+            if merged !== types[col_ind]
+                types[col_ind] = merged
+                changed = true
+            end
+        end
+    end
+
+    if changed
+        cache_ref[] = Tables.Schema(col_names, Tuple(types))
+    end
     return ts
 end
 
@@ -344,13 +373,33 @@ Tables.columnnames(row::TimeStepRow) = getfield(parent(row), :names)
 Set the value of a variable in a `TimeStepRow` object.
 """
 function Base.setindex!(row::TimeStepRow, x, i)
-    setproperty!(row_struct(row), i, x)
-    invalidate_schema_cache!(parent(row))
+    ts = parent(row)
+    raw = row_struct(row)
+    cache_ref = getfield(ts, :schema_cache)
+    if isnothing(cache_ref[])
+        setproperty!(raw, i, x)
+        return
+    end
+
+    old_type = typeof(raw[i])
+    setproperty!(raw, i, x)
+    new_type = typeof(raw[i])
+    old_type === new_type || invalidate_schema_cache!(ts)
 end
 
 function Base.setproperty!(row::TimeStepRow, nm::Symbol, x)
-    setproperty!(row_struct(row), nm, x)
-    invalidate_schema_cache!(parent(row))
+    ts = parent(row)
+    raw = row_struct(row)
+    cache_ref = getfield(ts, :schema_cache)
+    if isnothing(cache_ref[])
+        setproperty!(raw, nm, x)
+        return
+    end
+
+    old_type = typeof(raw[nm])
+    setproperty!(raw, nm, x)
+    new_type = typeof(raw[nm])
+    old_type === new_type || invalidate_schema_cache!(ts)
 end
 
 ##### Indexing and setting:
@@ -391,10 +440,24 @@ end
 # and then providing the values for the variable (must match the length).
 function Base.setproperty!(ts::TimeStepTable, s::Symbol, x)
     @assert length(x) == length(ts)
+    has_cached_schema = !isnothing(getfield(ts, :schema_cache)[])
+    type_changed = false
+
     for (i, row) in enumerate(Tables.rows(ts))
-        setproperty!(row_struct(row), s, x[i])
+        raw = row_struct(row)
+        if has_cached_schema
+            old_type = typeof(raw[s])
+            setproperty!(raw, s, x[i])
+            new_type = typeof(raw[s])
+            type_changed |= old_type !== new_type
+        else
+            setproperty!(raw, s, x[i])
+        end
     end
-    invalidate_schema_cache!(ts)
+
+    if type_changed
+        invalidate_schema_cache!(ts)
+    end
 end
 
 @inline function Base.getindex(ts::TimeStepTable, row_ind::Integer, col_ind::Integer)
@@ -493,12 +556,12 @@ end
 # Pushing and appending to a TimeStepTable object:
 function Base.push!(ts::TimeStepTable, x)
     push!(getfield(ts, :ts), x)
-    invalidate_schema_cache!(ts)
+    update_schema_cache_for_new_rows!(ts, (x,))
 end
 
 function Base.append!(ts::TimeStepTable, x)
     append!(getfield(ts, :ts), x)
-    invalidate_schema_cache!(ts)
+    update_schema_cache_for_new_rows!(ts, x)
 end
 
 

@@ -108,19 +108,37 @@ end
     @test sch1 === sch2
     @test sch1.types == (Int64,)
 
-    push!(ts_dict, Dict(:A => 3.0))
+    push!(ts_dict, Dict(:A => 3))
     sch3 = Tables.schema(ts_dict)
-    @test sch3 !== sch2
-    @test sch3.types[1] <: Union{Float64,Int64}
-    @test Union{Float64,Int64} <: sch3.types[1]
+    @test sch3 === sch2
+    @test sch3.types == (Int64,)
+
+    push!(ts_dict, Dict(:A => 3.0))
+    sch4 = Tables.schema(ts_dict)
+    @test sch4 !== sch3
+    @test sch4.types[1] <: Union{Float64,Int64}
+    @test Union{Float64,Int64} <: sch4.types[1]
 
     append!(ts_dict, [Dict(:A => nothing)])
-    sch4 = Tables.schema(ts_dict)
-    @test sch4.types[1] <: Union{Nothing,Float64,Int64}
-    @test Union{Nothing,Float64,Int64} <: sch4.types[1]
+    sch5 = Tables.schema(ts_dict)
+    @test sch5 !== sch4
+    @test sch5.types[1] <: Union{Nothing,Float64,Int64}
+    @test Union{Nothing,Float64,Int64} <: sch5.types[1]
 
     ts_mut = TimeStepTable([MutableSchemaRow(1), MutableSchemaRow(2)])
-    @test Tables.schema(ts_mut).types == (Int64,)
+    schm1 = Tables.schema(ts_mut)
+    @test schm1.types == (Int64,)
+
+    ts_mut.A = [3, 4]
+    schm2 = Tables.schema(ts_mut)
+    @test schm2 === schm1
+
+    ts_mut[1, :].A = 5
+    schm3 = Tables.schema(ts_mut)
+    @test schm3 === schm2
+
     ts_mut.A = [1.0, 2.0]
-    @test Tables.schema(ts_mut).types == (Float64,)
+    schm4 = Tables.schema(ts_mut)
+    @test schm4 !== schm3
+    @test schm4.types == (Float64,)
 end
