@@ -50,6 +50,13 @@ struct TimeStepTable{T}
     names::NTuple{N,Symbol} where {N}
     metadata::NamedTuple
     ts::Vector{T}
+    schema_cache::Base.RefValue{Union{Nothing,Tables.Schema}}
+end
+
+_new_schema_cache() = Ref{Union{Nothing,Tables.Schema}}(nothing)
+
+function TimeStepTable(names::NTuple{N,Symbol}, metadata::NamedTuple, ts::Vector{T}) where {N,T}
+    TimeStepTable{T}(names, metadata, ts, _new_schema_cache())
 end
 
 TimeStepTable(ts::V, metadata=NamedTuple()) where {V<:Vector} = TimeStepTable(keys(ts[1]), metadata, ts)
@@ -221,7 +228,15 @@ names(ts::TimeStepTable) = keys(ts)
 # matrix(ts::TimeStepTable) = reduce(hcat, [[i...] for i in ts])'
 
 function Tables.schema(m::TimeStepTable)
-    Tables.Schema(getfield(m, :names), infer_schema_types(m))
+    cache_ref = getfield(m, :schema_cache)
+    cached = cache_ref[]
+    if !isnothing(cached)
+        return cached
+    end
+
+    schema = Tables.Schema(getfield(m, :names), infer_schema_types(m))
+    cache_ref[] = schema
+    return schema
 end
 
 Tables.materializer(::Type{TimeStepTable}) = TimeStepTable
@@ -279,6 +294,11 @@ function infer_schema_types(ts::TimeStepTable)
     return types
 end
 
+@inline function invalidate_schema_cache!(ts::TimeStepTable)
+    getfield(ts, :schema_cache)[] = nothing
+    return ts
+end
+
 function Base.length(A::TimeStepTable{T}) where {T}
     length(getfield(A, :ts))
 end
@@ -325,10 +345,12 @@ Set the value of a variable in a `TimeStepRow` object.
 """
 function Base.setindex!(row::TimeStepRow, x, i)
     setproperty!(row_struct(row), i, x)
+    invalidate_schema_cache!(parent(row))
 end
 
 function Base.setproperty!(row::TimeStepRow, nm::Symbol, x)
     setproperty!(row_struct(row), nm, x)
+    invalidate_schema_cache!(parent(row))
 end
 
 ##### Indexing and setting:
@@ -370,8 +392,9 @@ end
 function Base.setproperty!(ts::TimeStepTable, s::Symbol, x)
     @assert length(x) == length(ts)
     for (i, row) in enumerate(Tables.rows(ts))
-        setproperty!(row, s, x[i])
+        setproperty!(row_struct(row), s, x[i])
     end
+    invalidate_schema_cache!(ts)
 end
 
 @inline function Base.getindex(ts::TimeStepTable, row_ind::Integer, col_ind::Integer)
@@ -470,10 +493,12 @@ end
 # Pushing and appending to a TimeStepTable object:
 function Base.push!(ts::TimeStepTable, x)
     push!(getfield(ts, :ts), x)
+    invalidate_schema_cache!(ts)
 end
 
 function Base.append!(ts::TimeStepTable, x)
     append!(getfield(ts, :ts), x)
+    invalidate_schema_cache!(ts)
 end
 
 

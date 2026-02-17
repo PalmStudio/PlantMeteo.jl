@@ -5,6 +5,13 @@ row_types = [
     ref_values
 ]
 
+mutable struct MutableSchemaRow
+    A::Any
+end
+Base.keys(::MutableSchemaRow) = (:A,)
+Base.getindex(r::MutableSchemaRow, ::Int) = r.A
+Base.getindex(r::MutableSchemaRow, s::Symbol) = getfield(r, s)
+
 for row_type in row_types
     @testset "Testing TimeStepTable{$(nameof(typeof(row_type)))}}" begin
         # row_type = row_types[2]
@@ -92,4 +99,28 @@ end
 
     df_mixed = DataFrame(ts_mixed)
     @test eltype(df_mixed.A) == Union{Nothing,Float64}
+end
+
+@testset "TimeStepTable schema cache invalidation" begin
+    ts_dict = TimeStepTable([Dict{Symbol,Any}(:A => 1), Dict{Symbol,Any}(:A => 2)])
+    sch1 = Tables.schema(ts_dict)
+    sch2 = Tables.schema(ts_dict)
+    @test sch1 === sch2
+    @test sch1.types == (Int64,)
+
+    push!(ts_dict, Dict(:A => 3.0))
+    sch3 = Tables.schema(ts_dict)
+    @test sch3 !== sch2
+    @test sch3.types[1] <: Union{Float64,Int64}
+    @test Union{Float64,Int64} <: sch3.types[1]
+
+    append!(ts_dict, [Dict(:A => nothing)])
+    sch4 = Tables.schema(ts_dict)
+    @test sch4.types[1] <: Union{Nothing,Float64,Int64}
+    @test Union{Nothing,Float64,Int64} <: sch4.types[1]
+
+    ts_mut = TimeStepTable([MutableSchemaRow(1), MutableSchemaRow(2)])
+    @test Tables.schema(ts_mut).types == (Int64,)
+    ts_mut.A = [1.0, 2.0]
+    @test Tables.schema(ts_mut).types == (Float64,)
 end
