@@ -150,5 +150,21 @@ end
     schm6 = Tables.schema(ts_mut)
     @test schm6 === schm5
 
+    ts_row = TimeStepTable([MutableSchemaRow(1), MutableSchemaRow(2)])
+    sch_row_1 = Tables.schema(ts_row)
+    @test sch_row_1.types == (Int64,)
+
+    # Different type via row update should invalidate cache, then schema should rebuild to a Union.
+    ts_row[1, :].A = 1.0
+    sch_row_2 = Tables.schema(ts_row)
+    @test sch_row_2 !== sch_row_1
+    @test sch_row_2.types[1] <: Union{Int64,Float64}
+    @test Union{Int64,Float64} <: sch_row_2.types[1]
+
+    # Once rebuilt, changing another row to an already allowed type should keep cache valid.
+    ts_row[2, :].A = 3.0
+    sch_row_3 = Tables.schema(ts_row)
+    @test sch_row_3 === sch_row_2
+
     @test_throws ArgumentError ts_mut.B = [1, 2]
 end
