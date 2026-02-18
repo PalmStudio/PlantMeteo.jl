@@ -51,12 +51,14 @@ struct TimeStepTable{T}
     metadata::NamedTuple
     ts::Vector{T}
     schema_cache::Base.RefValue{Union{Nothing,Tables.Schema}}
+    schema_cache_valid::Base.RefValue{Bool}
 end
 
 _new_schema_cache() = Ref{Union{Nothing,Tables.Schema}}(nothing)
+_new_schema_cache_valid() = Ref{Bool}(false)
 
 function TimeStepTable(names::NTuple{N,Symbol}, metadata::NamedTuple, ts::Vector{T}) where {N,T}
-    TimeStepTable{T}(names, metadata, ts, _new_schema_cache())
+    TimeStepTable{T}(names, metadata, ts, _new_schema_cache(), _new_schema_cache_valid())
 end
 
 TimeStepTable(ts::V, metadata=NamedTuple()) where {V<:Vector} = TimeStepTable(keys(ts[1]), metadata, ts)
@@ -145,6 +147,8 @@ Base.IndexStyle(::Type{<:TimeStepColumn}) = IndexLinear()
 
 @inline _row_get_value(row::AbstractDict, ::Int, col_name::Symbol) = row[col_name]
 @inline _row_get_value(row, col_ind::Int, ::Symbol) = row[col_ind]
+@inline _row_get_property_value(row::AbstractDict, nm::Symbol) = row[nm]
+@inline _row_get_property_value(row, nm::Symbol) = getproperty(row, nm)
 @inline function _row_set_value!(row::AbstractDict, ::Int, col_name::Symbol, x)
     setindex!(row, x, col_name)
     return nothing
@@ -236,14 +240,15 @@ names(ts::TimeStepTable) = keys(ts)
 # matrix(ts::TimeStepTable) = reduce(hcat, [[i...] for i in ts])'
 
 function Tables.schema(m::TimeStepTable)
-    cache_ref = getfield(m, :schema_cache)
-    cached = cache_ref[]
-    if !isnothing(cached)
-        return cached
+    cache_valid_ref = getfield(m, :schema_cache_valid)
+    if cache_valid_ref[]
+        return getfield(m, :schema_cache)[]::Tables.Schema
     end
 
+    cache_ref = getfield(m, :schema_cache)
     schema = Tables.Schema(getfield(m, :names), infer_schema_types(m))
     cache_ref[] = schema
+    cache_valid_ref[] = true
     return schema
 end
 
@@ -303,17 +308,21 @@ function infer_schema_types(ts::TimeStepTable)
 end
 
 @inline function invalidate_schema_cache!(ts::TimeStepTable)
-    cache_ref = getfield(ts, :schema_cache)
-    if !isnothing(cache_ref[])
+    cache_valid_ref = getfield(ts, :schema_cache_valid)
+    if cache_valid_ref[]
+        cache_ref = getfield(ts, :schema_cache)
         cache_ref[] = nothing
+        cache_valid_ref[] = false
     end
     return ts
 end
 
 function update_schema_cache_for_new_rows!(ts::TimeStepTable, new_rows)
+    cache_valid_ref = getfield(ts, :schema_cache_valid)
+    cache_valid_ref[] || return ts
+
     cache_ref = getfield(ts, :schema_cache)
-    cached = cache_ref[]
-    isnothing(cached) && return ts
+    cached = cache_ref[]::Tables.Schema
 
     col_names = getfield(ts, :names)
     types = Type[cached.types...]
@@ -374,6 +383,28 @@ end
     return branches
 end
 
+@generated function set_row_property_nocache!(raw::T, nm::Symbol, x) where {T}
+    if T <: AbstractDict
+        return quote
+            setindex!(raw, x, nm)
+            return nothing
+        end
+    end
+
+    branches = Expr(:block)
+    for field_name in fieldnames(T)
+        push!(branches.args, quote
+            if nm === $(QuoteNode(field_name))
+                setproperty!(raw, $(QuoteNode(field_name)), x)
+                return nothing
+            end
+        end)
+    end
+    push!(branches.args, :(setproperty!(raw, nm, x)))
+    push!(branches.args, :(return nothing))
+    return branches
+end
+
 function Base.length(A::TimeStepTable{T}) where {T}
     length(getfield(A, :ts))
 end
@@ -394,7 +425,7 @@ Base.size(t::TimeStepTable{T}, dim=1) where {T} = dim == 1 ? nrow(t) : ncol(t)
 Get `TimeStepRow` in its raw format, *e.g.* the `NamedTuple` that stores the values, 
 or the `Atmosphere` of values (or `Status` for `PlantSimEngine.jl`).
 """
-function row_struct(row::TimeStepRow)
+@inline function row_struct(row::TimeStepRow)
     getfield(parent(row), :ts)[rownumber(row)]
 end
 
@@ -404,6 +435,13 @@ end
 
 Get the value of a variable in a `TimeStepRow` object.
 """
+@inline function Base.getproperty(row::TimeStepRow, nm::Symbol)
+    if nm === :row || nm === :source
+        return getfield(row, nm)
+    end
+    return row_struct(row)[nm]
+end
+
 Tables.getcolumn(row::TimeStepRow, i) = row_struct(row)[i]
 
 # Defining the following two to avoid ambiguity warnings from Tables.jl:
@@ -418,49 +456,55 @@ Tables.columnnames(row::TimeStepRow) = getfield(parent(row), :names)
 
 Set the value of a variable in a `TimeStepRow` object.
 """
-function Base.setindex!(row::TimeStepRow, x, i)
+@inline function Base.setindex!(row::TimeStepRow, x, i)
     ts = parent(row)
     raw = row_struct(row)
     col_name = getfield(ts, :names)[i]
-    cache_ref = getfield(ts, :schema_cache)
-    if isnothing(cache_ref[])
+    if !getfield(ts, :schema_cache_valid)[]
         _row_set_value!(raw, i, col_name, x)
         return
     end
 
-    old_type = typeof(raw[i])
-    _row_set_value!(raw, i, col_name, x)
-    if x isa old_type
+    old_type = typeof(_row_get_value(raw, i, col_name))
+    if typeof(x) === old_type
+        _row_set_value!(raw, i, col_name, x)
         return
     end
 
-    cached = cache_ref[]
-    if isnothing(cached) || !(x isa cached.types[i])
-        invalidate_schema_cache!(ts)
+    cached = getfield(ts, :schema_cache)[]::Tables.Schema
+    if x isa cached.types[i]
+        _row_set_value!(raw, i, col_name, x)
+        return
     end
+
+    _row_set_value!(raw, i, col_name, x)
+    invalidate_schema_cache!(ts)
 end
 
-function Base.setproperty!(row::TimeStepRow, nm::Symbol, x)
+@inline function Base.setproperty!(row::TimeStepRow, nm::Symbol, x)
     ts = parent(row)
     raw = row_struct(row)
-    cache_ref = getfield(ts, :schema_cache)
-    if isnothing(cache_ref[])
-        setproperty!(raw, nm, x)
+    if !getfield(ts, :schema_cache_valid)[]
+        set_row_property_nocache!(raw, nm, x)
+        return
+    end
+
+    old_type = typeof(_row_get_property_value(raw, nm))
+    if typeof(x) === old_type
+        set_row_property_nocache!(raw, nm, x)
         return
     end
 
     col_ind = find_column_index(ts, nm)
     isnothing(col_ind) && throw(ArgumentError("Column $nm does not exist in the table."))
-    old_type = typeof(raw[nm])
-    setproperty!(raw, nm, x)
-    if x isa old_type
+    cached = getfield(ts, :schema_cache)[]::Tables.Schema
+    if x isa cached.types[col_ind]
+        _row_set_value!(raw, col_ind, nm, x)
         return
     end
 
-    cached = cache_ref[]
-    if isnothing(cached) || !(x isa cached.types[col_ind])
-        invalidate_schema_cache!(ts)
-    end
+    _row_set_value!(raw, col_ind, nm, x)
+    invalidate_schema_cache!(ts)
 end
 
 ##### Indexing and setting:
@@ -502,7 +546,11 @@ end
 function Base.setproperty!(ts::TimeStepTable, s::Symbol, x)
     @assert length(x) == length(ts)
     names_ = getfield(ts, :names)
-    cached_schema = getfield(ts, :schema_cache)[]
+    cached_schema = if getfield(ts, :schema_cache_valid)[]
+        getfield(ts, :schema_cache)[]::Tables.Schema
+    else
+        nothing
+    end
     rows = getfield(ts, :ts)
     if isnothing(cached_schema)
         set_column_values_nocache!(rows, names_, s, x)
@@ -539,7 +587,7 @@ end
 end
 
 @inline function Base.getindex(ts::TimeStepTable, row_ind::Integer, col_ind::Symbol)
-    col_i = findfirst(==(col_ind), getfield(ts, :names))
+    col_i = find_column_index(ts, col_ind)
     isnothing(col_i) && throw(ArgumentError("Column $col_ind does not exist in the table."))
     return getindex(ts, row_ind, col_i)
 end
