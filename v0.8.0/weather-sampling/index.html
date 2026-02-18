@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Weather Sampling · PlantMeteo.jl</title><meta name="title" content="Weather Sampling · PlantMeteo.jl"/><meta property="og:title" content="Weather Sampling · PlantMeteo.jl"/><meta property="twitter:title" content="Weather Sampling · PlantMeteo.jl"/><meta name="description" content="Documentation for PlantMeteo.jl."/><meta property="og:description" content="Documentation for PlantMeteo.jl."/><meta property="twitter:description" content="Documentation for PlantMeteo.jl."/><meta property="og:url" content="https://PalmStudio.github.io/PlantMeteo.jl/weather-sampling/"/><meta property="twitter:url" content="https://PalmStudio.github.io/PlantMeteo.jl/weather-sampling/"/><link rel="canonical" href="https://PalmStudio.github.io/PlantMeteo.jl/weather-sampling/"/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">PlantMeteo.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../getting-started/">Getting Started</a></li><li><span class="tocitem">Guides</span><ul><li><a class="tocitem" href="../weather-apis/">Weather Data Sources</a></li><li class="is-active"><a class="tocitem" href>Weather Sampling</a><ul class="internal"><li><a class="tocitem" href="#Why-Sampling?"><span>Why Sampling?</span></a></li><li><a class="tocitem" href="#Sampling-Workflow"><span>Sampling Workflow</span></a></li><li><a class="tocitem" href="#1.-Create-a-Small,-Predictable-Weather-Series"><span>1. Create a Small, Predictable Weather Series</span></a></li><li><a class="tocitem" href="#2.-Prepare-Sampler-State"><span>2. Prepare Sampler State</span></a></li><li><a class="tocitem" href="#3.-Rolling-Window-Sampling"><span>3. Rolling Window Sampling</span></a></li><li><a class="tocitem" href="#4.-Override-Variable-wise-Aggregation-Rules"><span>4. Override Variable-wise Aggregation Rules</span></a></li><li><a class="tocitem" href="#5.-Calendar-Window-Sampling"><span>5. Calendar Window Sampling</span></a></li><li><a class="tocitem" href="#6.-Precompute-for-Simulation-Loops"><span>6. Precompute for Simulation Loops</span></a></li></ul></li></ul></li><li><a class="tocitem" href="../API/">API</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Guides</a></li><li class="is-active"><a href>Weather Sampling</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Weather Sampling</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/PalmStudio/PlantMeteo.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/PalmStudio/PlantMeteo.jl/blob/main/docs/src/weather-sampling.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Weather-Sampling"><a class="docs-heading-anchor" href="#Weather-Sampling">Weather Sampling</a><a id="Weather-Sampling-1"></a><a class="docs-heading-anchor-permalink" href="#Weather-Sampling" title="Permalink"></a></h1><p>This guide explains how to align raw weather time steps with model requirements.</p><h2 id="Why-Sampling?"><a class="docs-heading-anchor" href="#Why-Sampling?">Why Sampling?</a><a id="Why-Sampling?-1"></a><a class="docs-heading-anchor-permalink" href="#Why-Sampling?" title="Permalink"></a></h2><p>A model often needs weather at a different temporal scale than the source data. Examples:</p><ul><li>source meteo is hourly, model step is 3 hours</li><li>source meteo is sub-hourly, model step is daily</li><li>a simulation needs both rolling and calendar-based aggregates</li></ul><p>The sampling API makes these choices explicit and testable.</p><h2 id="Sampling-Workflow"><a class="docs-heading-anchor" href="#Sampling-Workflow">Sampling Workflow</a><a id="Sampling-Workflow-1"></a><a class="docs-heading-anchor-permalink" href="#Sampling-Workflow" title="Permalink"></a></h2><ol><li>define the source weather table</li><li>prepare a sampler object (with optional caching)</li><li>choose a window specification</li><li>sample one step or materialize full sampled tables</li></ol><h2 id="1.-Create-a-Small,-Predictable-Weather-Series"><a class="docs-heading-anchor" href="#1.-Create-a-Small,-Predictable-Weather-Series">1. Create a Small, Predictable Weather Series</a><a id="1.-Create-a-Small,-Predictable-Weather-Series-1"></a><a class="docs-heading-anchor-permalink" href="#1.-Create-a-Small,-Predictable-Weather-Series" title="Permalink"></a></h2><p>For this example we&#39;ll use simple values so aggregation effects are easy to verify. We make 48 hourly rows (two days) with monotonic <code>T</code>:</p><pre><code class="language-julia hljs">using PlantMeteo
+using Dates
+using Statistics
+
+base = DateTime(2025, 1, 1)
+meteo = Weather([
+    Atmosphere(
+        date = base + Hour(i),
+        duration = Hour(1),
+        T = 10.0 + i,
+        Wind = 1.0,
+        Rh = 0.50 + 0.005 * i,
+        P = 100.0,
+        Ri_SW_f = 100.0 + 10.0 * i
+    )
+    for i in 0:47
+])
+
+meteo</code></pre><table>
+  <thead>
+    <tr class = "title">
+      <td colspan = "23" style = "font-size: x-large; font-weight: bold; text-align: center;">TimeStepTable{Atmosphere{(:date, :duration,...}(48 x 22):</td>
+    </tr>
+    <tr class = "columnLabelRow">
+      <th class = "stubheadLabel" style = "font-weight: bold; text-align: right;"></th>
+      <th style = "font-weight: bold; text-align: right;">date</th>
+      <th style = "font-weight: bold; text-align: right;">duration</th>
+      <th style = "font-weight: bold; text-align: right;">T</th>
+      <th style = "font-weight: bold; text-align: right;">Wind</th>
+      <th style = "font-weight: bold; text-align: right;">P</th>
+      <th style = "font-weight: bold; text-align: right;">Rh</th>
+      <th style = "font-weight: bold; text-align: right;">Precipitations</th>
+      <th style = "font-weight: bold; text-align: right;">Cₐ</th>
+      <th style = "font-weight: bold; text-align: right;">e</th>
+      <th style = "font-weight: bold; text-align: right;">eₛ</th>
+      <th style = "font-weight: bold; text-align: right;">VPD</th>
+      <th style = "font-weight: bold; text-align: right;">ρ</th>
+      <th style = "font-weight: bold; text-align: right;">λ</th>
+      <th style = "font-weight: bold; text-align: right;">γ</th>
+      <th style = "font-weight: bold; text-align: right;">ε</th>
+      <th style = "font-weight: bold; text-align: right;">Δ</th>
+      <th style = "font-weight: bold; text-align: right;">clearness</th>
+      <th style = "font-weight: bold; text-align: right;">Ri_SW_f</th>
+      <th style = "font-weight: bold; text-align: right;">Ri_PAR_f</th>
+      <th style = "font-weight: bold; text-align: right;">Ri_NIR_f</th>
+      <th style = "font-weight: bold; text-align: right;">Ri_TIR_f</th>
+      <th style = "font-weight: bold; text-align: right;">Ri_custom_f</th>
+    </tr>
+    <tr class = "columnLabelRow">
+      <th class = "stubheadLabel" style = "font-weight: bold; text-align: right;"></th>
+      <th style = "text-align: right;">DateTime</th>
+      <th style = "text-align: right;">Hour</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+      <th style = "text-align: right;">Float64</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">1</td>
+      <td style = "text-align: right;">2025-01-01T00:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">10.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.5</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">0.61635</td>
+      <td style = "text-align: right;">1.2327</td>
+      <td style = "text-align: right;">0.61635</td>
+      <td style = "text-align: right;">1.23031</td>
+      <td style = "text-align: right;">2.47735e6</td>
+      <td style = "text-align: right;">0.0657403</td>
+      <td style = "text-align: right;">0.516341</td>
+      <td style = "text-align: right;">0.0827838</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">2</td>
+      <td style = "text-align: right;">2025-01-01T01:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">11.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.505</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">0.665446</td>
+      <td style = "text-align: right;">1.31772</td>
+      <td style = "text-align: right;">0.652269</td>
+      <td style = "text-align: right;">1.22598</td>
+      <td style = "text-align: right;">2.47498e6</td>
+      <td style = "text-align: right;">0.0658031</td>
+      <td style = "text-align: right;">0.521763</td>
+      <td style = "text-align: right;">0.08779</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">110.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">3</td>
+      <td style = "text-align: right;">2025-01-01T02:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">12.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.51</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">0.718005</td>
+      <td style = "text-align: right;">1.40785</td>
+      <td style = "text-align: right;">0.689848</td>
+      <td style = "text-align: right;">1.22168</td>
+      <td style = "text-align: right;">2.47262e6</td>
+      <td style = "text-align: right;">0.0658661</td>
+      <td style = "text-align: right;">0.527195</td>
+      <td style = "text-align: right;">0.0930528</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">120.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">4</td>
+      <td style = "text-align: right;">2025-01-01T03:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">13.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.515</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">0.774236</td>
+      <td style = "text-align: right;">1.50337</td>
+      <td style = "text-align: right;">0.729135</td>
+      <td style = "text-align: right;">1.21741</td>
+      <td style = "text-align: right;">2.47026e6</td>
+      <td style = "text-align: right;">0.0659291</td>
+      <td style = "text-align: right;">0.532638</td>
+      <td style = "text-align: right;">0.0985828</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">130.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">5</td>
+      <td style = "text-align: right;">2025-01-01T04:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">14.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.52</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">0.834363</td>
+      <td style = "text-align: right;">1.60454</td>
+      <td style = "text-align: right;">0.770181</td>
+      <td style = "text-align: right;">1.21317</td>
+      <td style = "text-align: right;">2.46789e6</td>
+      <td style = "text-align: right;">0.0659923</td>
+      <td style = "text-align: right;">0.538091</td>
+      <td style = "text-align: right;">0.104391</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">140.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">6</td>
+      <td style = "text-align: right;">2025-01-01T05:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">15.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.525</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">0.898619</td>
+      <td style = "text-align: right;">1.71165</td>
+      <td style = "text-align: right;">0.813036</td>
+      <td style = "text-align: right;">1.20896</td>
+      <td style = "text-align: right;">2.46552e6</td>
+      <td style = "text-align: right;">0.0660556</td>
+      <td style = "text-align: right;">0.543555</td>
+      <td style = "text-align: right;">0.110488</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">150.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">7</td>
+      <td style = "text-align: right;">2025-01-01T06:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">16.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.53</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">0.967248</td>
+      <td style = "text-align: right;">1.825</td>
+      <td style = "text-align: right;">0.857749</td>
+      <td style = "text-align: right;">1.20478</td>
+      <td style = "text-align: right;">2.46316e6</td>
+      <td style = "text-align: right;">0.066119</td>
+      <td style = "text-align: right;">0.549028</td>
+      <td style = "text-align: right;">0.116887</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">160.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">8</td>
+      <td style = "text-align: right;">2025-01-01T07:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">17.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.535</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">1.04051</td>
+      <td style = "text-align: right;">1.94488</td>
+      <td style = "text-align: right;">0.904368</td>
+      <td style = "text-align: right;">1.20062</td>
+      <td style = "text-align: right;">2.4608e6</td>
+      <td style = "text-align: right;">0.0661826</td>
+      <td style = "text-align: right;">0.554511</td>
+      <td style = "text-align: right;">0.123598</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">170.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">9</td>
+      <td style = "text-align: right;">2025-01-01T08:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">18.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.54</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">1.11867</td>
+      <td style = "text-align: right;">2.07162</td>
+      <td style = "text-align: right;">0.952943</td>
+      <td style = "text-align: right;">1.1965</td>
+      <td style = "text-align: right;">2.45843e6</td>
+      <td style = "text-align: right;">0.0662462</td>
+      <td style = "text-align: right;">0.560003</td>
+      <td style = "text-align: right;">0.130635</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">180.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">10</td>
+      <td style = "text-align: right;">2025-01-01T09:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">19.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.545</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">1.20202</td>
+      <td style = "text-align: right;">2.20554</td>
+      <td style = "text-align: right;">1.00352</td>
+      <td style = "text-align: right;">1.1924</td>
+      <td style = "text-align: right;">2.45606e6</td>
+      <td style = "text-align: right;">0.06631</td>
+      <td style = "text-align: right;">0.565504</td>
+      <td style = "text-align: right;">0.138009</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">190.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">11</td>
+      <td style = "text-align: right;">2025-01-01T10:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">20.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.55</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">1.29085</td>
+      <td style = "text-align: right;">2.347</td>
+      <td style = "text-align: right;">1.05615</td>
+      <td style = "text-align: right;">1.18834</td>
+      <td style = "text-align: right;">2.4537e6</td>
+      <td style = "text-align: right;">0.0663739</td>
+      <td style = "text-align: right;">0.571015</td>
+      <td style = "text-align: right;">0.145734</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">200.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">12</td>
+      <td style = "text-align: right;">2025-01-01T11:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">21.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.555</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">1.38547</td>
+      <td style = "text-align: right;">2.49634</td>
+      <td style = "text-align: right;">1.11087</td>
+      <td style = "text-align: right;">1.1843</td>
+      <td style = "text-align: right;">2.45134e6</td>
+      <td style = "text-align: right;">0.066438</td>
+      <td style = "text-align: right;">0.576534</td>
+      <td style = "text-align: right;">0.153823</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">210.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">13</td>
+      <td style = "text-align: right;">2025-01-01T12:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">22.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.56</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">1.48621</td>
+      <td style = "text-align: right;">2.65394</td>
+      <td style = "text-align: right;">1.16773</td>
+      <td style = "text-align: right;">1.18028</td>
+      <td style = "text-align: right;">2.44897e6</td>
+      <td style = "text-align: right;">0.0665021</td>
+      <td style = "text-align: right;">0.582061</td>
+      <td style = "text-align: right;">0.162289</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">220.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">14</td>
+      <td style = "text-align: right;">2025-01-01T13:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">23.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.565</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">1.5934</td>
+      <td style = "text-align: right;">2.82018</td>
+      <td style = "text-align: right;">1.22678</td>
+      <td style = "text-align: right;">1.1763</td>
+      <td style = "text-align: right;">2.4466e6</td>
+      <td style = "text-align: right;">0.0665664</td>
+      <td style = "text-align: right;">0.587597</td>
+      <td style = "text-align: right;">0.171147</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">230.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">15</td>
+      <td style = "text-align: right;">2025-01-01T14:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">24.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.57</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">1.70741</td>
+      <td style = "text-align: right;">2.99546</td>
+      <td style = "text-align: right;">1.28805</td>
+      <td style = "text-align: right;">1.17234</td>
+      <td style = "text-align: right;">2.44424e6</td>
+      <td style = "text-align: right;">0.0666308</td>
+      <td style = "text-align: right;">0.593142</td>
+      <td style = "text-align: right;">0.180411</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">240.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">16</td>
+      <td style = "text-align: right;">2025-01-01T15:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">25.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.575</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">1.82861</td>
+      <td style = "text-align: right;">3.1802</td>
+      <td style = "text-align: right;">1.35158</td>
+      <td style = "text-align: right;">1.16841</td>
+      <td style = "text-align: right;">2.44188e6</td>
+      <td style = "text-align: right;">0.0666954</td>
+      <td style = "text-align: right;">0.598694</td>
+      <td style = "text-align: right;">0.190095</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">250.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">17</td>
+      <td style = "text-align: right;">2025-01-01T16:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">26.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.58</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">1.95739</td>
+      <td style = "text-align: right;">3.37481</td>
+      <td style = "text-align: right;">1.41742</td>
+      <td style = "text-align: right;">1.1645</td>
+      <td style = "text-align: right;">2.43951e6</td>
+      <td style = "text-align: right;">0.06676</td>
+      <td style = "text-align: right;">0.604253</td>
+      <td style = "text-align: right;">0.200215</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">260.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">18</td>
+      <td style = "text-align: right;">2025-01-01T17:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">27.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.585</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">2.09415</td>
+      <td style = "text-align: right;">3.57974</td>
+      <td style = "text-align: right;">1.48559</td>
+      <td style = "text-align: right;">1.16062</td>
+      <td style = "text-align: right;">2.43714e6</td>
+      <td style = "text-align: right;">0.0668248</td>
+      <td style = "text-align: right;">0.609821</td>
+      <td style = "text-align: right;">0.210787</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">270.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">19</td>
+      <td style = "text-align: right;">2025-01-01T18:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">28.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.59</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">2.23932</td>
+      <td style = "text-align: right;">3.79546</td>
+      <td style = "text-align: right;">1.55614</td>
+      <td style = "text-align: right;">1.15677</td>
+      <td style = "text-align: right;">2.43478e6</td>
+      <td style = "text-align: right;">0.0668897</td>
+      <td style = "text-align: right;">0.615395</td>
+      <td style = "text-align: right;">0.221826</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">280.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">20</td>
+      <td style = "text-align: right;">2025-01-01T19:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">29.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.595</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">2.39334</td>
+      <td style = "text-align: right;">4.02243</td>
+      <td style = "text-align: right;">1.62908</td>
+      <td style = "text-align: right;">1.15294</td>
+      <td style = "text-align: right;">2.43242e6</td>
+      <td style = "text-align: right;">0.0669547</td>
+      <td style = "text-align: right;">0.620977</td>
+      <td style = "text-align: right;">0.233348</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">290.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">21</td>
+      <td style = "text-align: right;">2025-01-01T20:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">30.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.6</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">2.55669</td>
+      <td style = "text-align: right;">4.26114</td>
+      <td style = "text-align: right;">1.70446</td>
+      <td style = "text-align: right;">1.14914</td>
+      <td style = "text-align: right;">2.43005e6</td>
+      <td style = "text-align: right;">0.0670199</td>
+      <td style = "text-align: right;">0.626565</td>
+      <td style = "text-align: right;">0.24537</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">300.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">22</td>
+      <td style = "text-align: right;">2025-01-01T21:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">31.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.605</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">2.72983</td>
+      <td style = "text-align: right;">4.51211</td>
+      <td style = "text-align: right;">1.78228</td>
+      <td style = "text-align: right;">1.14536</td>
+      <td style = "text-align: right;">2.42768e6</td>
+      <td style = "text-align: right;">0.0670852</td>
+      <td style = "text-align: right;">0.632161</td>
+      <td style = "text-align: right;">0.257909</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">310.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">23</td>
+      <td style = "text-align: right;">2025-01-01T22:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">32.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.61</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">2.91328</td>
+      <td style = "text-align: right;">4.77586</td>
+      <td style = "text-align: right;">1.86259</td>
+      <td style = "text-align: right;">1.14161</td>
+      <td style = "text-align: right;">2.42532e6</td>
+      <td style = "text-align: right;">0.0671506</td>
+      <td style = "text-align: right;">0.637763</td>
+      <td style = "text-align: right;">0.270983</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">320.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">24</td>
+      <td style = "text-align: right;">2025-01-01T23:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">33.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.615</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">3.10755</td>
+      <td style = "text-align: right;">5.05293</td>
+      <td style = "text-align: right;">1.94538</td>
+      <td style = "text-align: right;">1.13788</td>
+      <td style = "text-align: right;">2.42296e6</td>
+      <td style = "text-align: right;">0.0672162</td>
+      <td style = "text-align: right;">0.643371</td>
+      <td style = "text-align: right;">0.28461</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">330.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">25</td>
+      <td style = "text-align: right;">2025-01-02T00:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">34.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.62</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">3.31321</td>
+      <td style = "text-align: right;">5.34388</td>
+      <td style = "text-align: right;">2.03067</td>
+      <td style = "text-align: right;">1.13417</td>
+      <td style = "text-align: right;">2.42059e6</td>
+      <td style = "text-align: right;">0.0672818</td>
+      <td style = "text-align: right;">0.648985</td>
+      <td style = "text-align: right;">0.298807</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">340.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">26</td>
+      <td style = "text-align: right;">2025-01-02T01:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">35.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.625</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">3.53081</td>
+      <td style = "text-align: right;">5.64929</td>
+      <td style = "text-align: right;">2.11848</td>
+      <td style = "text-align: right;">1.13049</td>
+      <td style = "text-align: right;">2.41822e6</td>
+      <td style = "text-align: right;">0.0673476</td>
+      <td style = "text-align: right;">0.654605</td>
+      <td style = "text-align: right;">0.313593</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">350.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">27</td>
+      <td style = "text-align: right;">2025-01-02T02:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">36.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.63</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">3.76095</td>
+      <td style = "text-align: right;">5.96976</td>
+      <td style = "text-align: right;">2.20881</td>
+      <td style = "text-align: right;">1.12683</td>
+      <td style = "text-align: right;">2.41586e6</td>
+      <td style = "text-align: right;">0.0674136</td>
+      <td style = "text-align: right;">0.660231</td>
+      <td style = "text-align: right;">0.328987</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">360.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">28</td>
+      <td style = "text-align: right;">2025-01-02T03:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">37.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.635</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">4.00425</td>
+      <td style = "text-align: right;">6.30591</td>
+      <td style = "text-align: right;">2.30166</td>
+      <td style = "text-align: right;">1.1232</td>
+      <td style = "text-align: right;">2.4135e6</td>
+      <td style = "text-align: right;">0.0674796</td>
+      <td style = "text-align: right;">0.665863</td>
+      <td style = "text-align: right;">0.34501</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">370.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">29</td>
+      <td style = "text-align: right;">2025-01-02T04:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">38.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.64</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">4.26135</td>
+      <td style = "text-align: right;">6.65836</td>
+      <td style = "text-align: right;">2.39701</td>
+      <td style = "text-align: right;">1.11959</td>
+      <td style = "text-align: right;">2.41113e6</td>
+      <td style = "text-align: right;">0.0675458</td>
+      <td style = "text-align: right;">0.6715</td>
+      <td style = "text-align: right;">0.36168</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">380.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">30</td>
+      <td style = "text-align: right;">2025-01-02T05:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">39.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.645</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">4.53292</td>
+      <td style = "text-align: right;">7.02779</td>
+      <td style = "text-align: right;">2.49487</td>
+      <td style = "text-align: right;">1.116</td>
+      <td style = "text-align: right;">2.40876e6</td>
+      <td style = "text-align: right;">0.0676121</td>
+      <td style = "text-align: right;">0.677142</td>
+      <td style = "text-align: right;">0.379018</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">390.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">31</td>
+      <td style = "text-align: right;">2025-01-02T06:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">40.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.65</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">4.81966</td>
+      <td style = "text-align: right;">7.41486</td>
+      <td style = "text-align: right;">2.5952</td>
+      <td style = "text-align: right;">1.11244</td>
+      <td style = "text-align: right;">2.4064e6</td>
+      <td style = "text-align: right;">0.0676786</td>
+      <td style = "text-align: right;">0.68279</td>
+      <td style = "text-align: right;">0.397045</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">32</td>
+      <td style = "text-align: right;">2025-01-02T07:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">41.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.655</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">5.12228</td>
+      <td style = "text-align: right;">7.82028</td>
+      <td style = "text-align: right;">2.698</td>
+      <td style = "text-align: right;">1.1089</td>
+      <td style = "text-align: right;">2.40404e6</td>
+      <td style = "text-align: right;">0.0677452</td>
+      <td style = "text-align: right;">0.688442</td>
+      <td style = "text-align: right;">0.415781</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">410.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">33</td>
+      <td style = "text-align: right;">2025-01-02T08:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">42.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.66</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">5.44154</td>
+      <td style = "text-align: right;">8.24476</td>
+      <td style = "text-align: right;">2.80322</td>
+      <td style = "text-align: right;">1.10538</td>
+      <td style = "text-align: right;">2.40167e6</td>
+      <td style = "text-align: right;">0.0678119</td>
+      <td style = "text-align: right;">0.694099</td>
+      <td style = "text-align: right;">0.435249</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">420.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">34</td>
+      <td style = "text-align: right;">2025-01-02T09:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">43.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.665</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">5.77822</td>
+      <td style = "text-align: right;">8.68905</td>
+      <td style = "text-align: right;">2.91083</td>
+      <td style = "text-align: right;">1.10188</td>
+      <td style = "text-align: right;">2.3993e6</td>
+      <td style = "text-align: right;">0.0678787</td>
+      <td style = "text-align: right;">0.69976</td>
+      <td style = "text-align: right;">0.455471</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">430.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">35</td>
+      <td style = "text-align: right;">2025-01-02T10:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">44.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.67</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">6.13311</td>
+      <td style = "text-align: right;">9.1539</td>
+      <td style = "text-align: right;">3.02079</td>
+      <td style = "text-align: right;">1.09841</td>
+      <td style = "text-align: right;">2.39694e6</td>
+      <td style = "text-align: right;">0.0679457</td>
+      <td style = "text-align: right;">0.705426</td>
+      <td style = "text-align: right;">0.476468</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">440.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">36</td>
+      <td style = "text-align: right;">2025-01-02T11:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">45.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.675</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">6.50707</td>
+      <td style = "text-align: right;">9.64011</td>
+      <td style = "text-align: right;">3.13304</td>
+      <td style = "text-align: right;">1.09496</td>
+      <td style = "text-align: right;">2.39458e6</td>
+      <td style = "text-align: right;">0.0680128</td>
+      <td style = "text-align: right;">0.711096</td>
+      <td style = "text-align: right;">0.498264</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">450.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">37</td>
+      <td style = "text-align: right;">2025-01-02T12:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">46.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.68</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">6.90097</td>
+      <td style = "text-align: right;">10.1485</td>
+      <td style = "text-align: right;">3.24751</td>
+      <td style = "text-align: right;">1.09153</td>
+      <td style = "text-align: right;">2.39221e6</td>
+      <td style = "text-align: right;">0.06808</td>
+      <td style = "text-align: right;">0.71677</td>
+      <td style = "text-align: right;">0.520882</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">460.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">38</td>
+      <td style = "text-align: right;">2025-01-02T13:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">47.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.685</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">7.3157</td>
+      <td style = "text-align: right;">10.6799</td>
+      <td style = "text-align: right;">3.36415</td>
+      <td style = "text-align: right;">1.08812</td>
+      <td style = "text-align: right;">2.38984e6</td>
+      <td style = "text-align: right;">0.0681474</td>
+      <td style = "text-align: right;">0.722448</td>
+      <td style = "text-align: right;">0.544346</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">470.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">39</td>
+      <td style = "text-align: right;">2025-01-02T14:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">48.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.69</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">7.7522</td>
+      <td style = "text-align: right;">11.2351</td>
+      <td style = "text-align: right;">3.48287</td>
+      <td style = "text-align: right;">1.08473</td>
+      <td style = "text-align: right;">2.38748e6</td>
+      <td style = "text-align: right;">0.0682149</td>
+      <td style = "text-align: right;">0.72813</td>
+      <td style = "text-align: right;">0.56868</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">480.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">40</td>
+      <td style = "text-align: right;">2025-01-02T15:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">49.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.695</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">8.21145</td>
+      <td style = "text-align: right;">11.815</td>
+      <td style = "text-align: right;">3.60359</td>
+      <td style = "text-align: right;">1.08136</td>
+      <td style = "text-align: right;">2.38512e6</td>
+      <td style = "text-align: right;">0.0682826</td>
+      <td style = "text-align: right;">0.733815</td>
+      <td style = "text-align: right;">0.593908</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">490.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">41</td>
+      <td style = "text-align: right;">2025-01-02T16:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">50.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.7</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">8.69444</td>
+      <td style = "text-align: right;">12.4206</td>
+      <td style = "text-align: right;">3.72619</td>
+      <td style = "text-align: right;">1.07802</td>
+      <td style = "text-align: right;">2.38275e6</td>
+      <td style = "text-align: right;">0.0683503</td>
+      <td style = "text-align: right;">0.739504</td>
+      <td style = "text-align: right;">0.620055</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">500.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">42</td>
+      <td style = "text-align: right;">2025-01-02T17:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">51.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.705</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">9.20222</td>
+      <td style = "text-align: right;">13.0528</td>
+      <td style = "text-align: right;">3.85058</td>
+      <td style = "text-align: right;">1.07469</td>
+      <td style = "text-align: right;">2.38038e6</td>
+      <td style = "text-align: right;">0.0684182</td>
+      <td style = "text-align: right;">0.745196</td>
+      <td style = "text-align: right;">0.647148</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">510.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">43</td>
+      <td style = "text-align: right;">2025-01-02T18:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">52.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.71</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">9.73587</td>
+      <td style = "text-align: right;">13.7125</td>
+      <td style = "text-align: right;">3.97662</td>
+      <td style = "text-align: right;">1.07139</td>
+      <td style = "text-align: right;">2.37802e6</td>
+      <td style = "text-align: right;">0.0684863</td>
+      <td style = "text-align: right;">0.750891</td>
+      <td style = "text-align: right;">0.675211</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">520.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">44</td>
+      <td style = "text-align: right;">2025-01-02T19:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">53.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.715</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">10.2965</td>
+      <td style = "text-align: right;">14.4007</td>
+      <td style = "text-align: right;">4.1042</td>
+      <td style = "text-align: right;">1.0681</td>
+      <td style = "text-align: right;">2.37566e6</td>
+      <td style = "text-align: right;">0.0685545</td>
+      <td style = "text-align: right;">0.756588</td>
+      <td style = "text-align: right;">0.704272</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">530.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">45</td>
+      <td style = "text-align: right;">2025-01-02T20:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">54.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.72</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">10.8853</td>
+      <td style = "text-align: right;">15.1184</td>
+      <td style = "text-align: right;">4.23316</td>
+      <td style = "text-align: right;">1.06484</td>
+      <td style = "text-align: right;">2.37329e6</td>
+      <td style = "text-align: right;">0.0686228</td>
+      <td style = "text-align: right;">0.762289</td>
+      <td style = "text-align: right;">0.734356</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">540.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">46</td>
+      <td style = "text-align: right;">2025-01-02T21:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">55.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.725</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">11.5034</td>
+      <td style = "text-align: right;">15.8667</td>
+      <td style = "text-align: right;">4.36334</td>
+      <td style = "text-align: right;">1.06159</td>
+      <td style = "text-align: right;">2.37092e6</td>
+      <td style = "text-align: right;">0.0686912</td>
+      <td style = "text-align: right;">0.767992</td>
+      <td style = "text-align: right;">0.765492</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">550.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">47</td>
+      <td style = "text-align: right;">2025-01-02T22:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">56.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.73</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">12.152</td>
+      <td style = "text-align: right;">16.6466</td>
+      <td style = "text-align: right;">4.49458</td>
+      <td style = "text-align: right;">1.05837</td>
+      <td style = "text-align: right;">2.36856e6</td>
+      <td style = "text-align: right;">0.0687598</td>
+      <td style = "text-align: right;">0.773698</td>
+      <td style = "text-align: right;">0.797707</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">560.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+    <tr class = "dataRow">
+      <td class = "rowLabel" style = "font-weight: bold; text-align: right;">48</td>
+      <td style = "text-align: right;">2025-01-02T23:00:00</td>
+      <td style = "text-align: right;">1 hour</td>
+      <td style = "text-align: right;">57.0</td>
+      <td style = "text-align: right;">1.0</td>
+      <td style = "text-align: right;">100.0</td>
+      <td style = "text-align: right;">0.735</td>
+      <td style = "text-align: right;">0.0</td>
+      <td style = "text-align: right;">400.0</td>
+      <td style = "text-align: right;">12.8325</td>
+      <td style = "text-align: right;">17.4592</td>
+      <td style = "text-align: right;">4.62669</td>
+      <td style = "text-align: right;">1.05516</td>
+      <td style = "text-align: right;">2.3662e6</td>
+      <td style = "text-align: right;">0.0688285</td>
+      <td style = "text-align: right;">0.779406</td>
+      <td style = "text-align: right;">0.831029</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">570.0</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+      <td style = "text-align: right;">Inf</td>
+    </tr>
+  </tbody>
+</table>
+<h2 id="2.-Prepare-Sampler-State"><a class="docs-heading-anchor" href="#2.-Prepare-Sampler-State">2. Prepare Sampler State</a><a id="2.-Prepare-Sampler-State-1"></a><a class="docs-heading-anchor-permalink" href="#2.-Prepare-Sampler-State" title="Permalink"></a></h2><p>We can normalize transforms and enable query-level memoization with <code>prepare_weather_sampler</code>. This is optional but can speed up repeated calls with the same windows. This is done so that repeated identical calls can return cached objects (<code>lazy=true</code>).</p><pre><code class="language-julia hljs">prepared = prepare_weather_sampler(meteo)  # lazy cache enabled by default
+typeof(prepared)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">PreparedWeather{TimeStepTable{Atmosphere{(:date, :duration, :T, :Wind, :P, :Rh, :Precipitations, :Cₐ, :e, :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ, :clearness, :Ri_SW_f, :Ri_PAR_f, :Ri_NIR_f, :Ri_TIR_f, :Ri_custom_f), Tuple{DateTime, Hour, Vararg{Float64, 20}}}}, Vector{MeteoTransform}, Dict{Tuple{Int64, UInt64, UInt64}, Any}, Dict{UInt64, Any}}</code></pre><h2 id="3.-Rolling-Window-Sampling"><a class="docs-heading-anchor" href="#3.-Rolling-Window-Sampling">3. Rolling Window Sampling</a><a id="3.-Rolling-Window-Sampling-1"></a><a class="docs-heading-anchor-permalink" href="#3.-Rolling-Window-Sampling" title="Permalink"></a></h2><p>We can then aggregate over a trailing window in source-step units using <code>sample_weather</code>, which returns one aggregated <code>Atmosphere</code>.</p><pre><code class="language-julia hljs">window2 = RollingWindow(2.0)
+row3 = sample_weather(prepared, 3; window = window2)
+row3_cached = sample_weather(prepared, 3; window = window2)
+
+(row3.T, row3.Tmin, row3.Tmax, row3_cached === row3)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(11.5, 11.0, 12.0, true)</code></pre><p><code>sample_weather</code> provides default transforms for common variables (<em>i.e.</em> the ones in <code>Atmosphere</code>), but you can override them with custom rules (see next section).</p><h2 id="4.-Override-Variable-wise-Aggregation-Rules"><a class="docs-heading-anchor" href="#4.-Override-Variable-wise-Aggregation-Rules">4. Override Variable-wise Aggregation Rules</a><a id="4.-Override-Variable-wise-Aggregation-Rules-1"></a><a class="docs-heading-anchor-permalink" href="#4.-Override-Variable-wise-Aggregation-Rules" title="Permalink"></a></h2><p>We can match aggregation logic to model semantics by overriding variable-wise aggregation rules. Custom transforms are normalized and applied for this call.</p><pre><code class="language-julia hljs">custom = (
+    T = MeanWeighted(),
+    Tmax = (source = :T, reducer = MaxReducer()),
+    Tsum = (source = :T, reducer = SumReducer())
+)
+
+row_custom = sample_weather(prepared, 3; window = window2, transforms = custom)
+(row_custom.T, row_custom.Tmax, row_custom.Tsum)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(11.5, 12.0, 23.0)</code></pre><h2 id="5.-Calendar-Window-Sampling"><a class="docs-heading-anchor" href="#5.-Calendar-Window-Sampling">5. Calendar Window Sampling</a><a id="5.-Calendar-Window-Sampling-1"></a><a class="docs-heading-anchor-permalink" href="#5.-Calendar-Window-Sampling" title="Permalink"></a></h2><p>Sometimes model logic is tied to civil periods (day/week/month) rather than fixed trailing windows. In this case, we can use <code>CalendarWindow</code> to aggregate all source steps that fall within the same period. This is useful for <em>e.g.</em> daily models that need to aggregate all hourly steps that fall within the same day, regardless of how many there are or where they fall in the source data. For example if you need the average temperature for the day, you can use a <code>CalendarWindow</code> anchored to the current period:</p><pre><code class="language-julia hljs">window_day = CalendarWindow(:day)
+day_sample = sample_weather(prepared, 5; window = window_day)
+(day_sample.T, day_sample.Tmin, day_sample.Tmax, day_sample.duration)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(21.5, 10.0, 33.0, Millisecond(86400000))</code></pre><p>We sample the fifth hour of the series, which falls on the first day. The sampled <code>T</code> is the average of the 24 hourly steps that fall within that day, which matches our expectation for a daily aggregation:</p><pre><code class="language-julia hljs">mean(meteo[i].T for i in 1:24)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">21.5</code></pre><p>The result would be the same for any hour from 1 to 24, since they all fall in the same day:</p><pre><code class="language-julia hljs">day_sample2 = sample_weather(prepared, 20; window = window_day)
+day_sample2.T == day_sample.T</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">true</code></pre><p>The aggregated results are cached, so repeated calls with the same window and query step will return the same values, and it means that performance will be ensured for long simulation loops with repeated calls:</p><pre><code class="language-julia hljs">day_sample_cached = sample_weather(prepared, 6; window = window_day)
+day_sample_cached.T === day_sample.T</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">true</code></pre><p>The returned <code>Atmosphere</code> is different though, since the date (and sometimes duration) are different for each query step, even if the aggregated values are the same:</p><pre><code class="language-julia hljs">day_sample.date, day_sample_cached.date, day_sample2.date</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(DateTime(&quot;2025-01-01T04:00:00&quot;), DateTime(&quot;2025-01-01T05:00:00&quot;), DateTime(&quot;2025-01-01T19:00:00&quot;))</code></pre><p>Note that <code>CalendarWindow</code> expects a <code>date::DateTime</code> column in the weather. By default, it checks for completeness of the period, but you can use <code>completeness = :allow_partial</code> to authorize incomplete periods. This is also faster since it doesn&#39;t have to perform checks.</p><h2 id="6.-Precompute-for-Simulation-Loops"><a class="docs-heading-anchor" href="#6.-Precompute-for-Simulation-Loops">6. Precompute for Simulation Loops</a><a id="6.-Precompute-for-Simulation-Loops-1"></a><a class="docs-heading-anchor-permalink" href="#6.-Precompute-for-Simulation-Loops" title="Permalink"></a></h2><p>When running long simulations, you can precompute all sampled weather tables upfront rather than sampling on-demand at each step. This trades a one-time preprocessing cost for faster lookups during the simulation loop. The <code>materialize_weather</code> function returns one sampled table per requested sampling window, allowing efficient access throughout your simulation.</p><pre><code class="language-julia hljs">windows = [window2, window_day]
+tables = materialize_weather(prepared; windows = windows)
+
+(length(tables), length(tables[window2]), tables[window2][3].T ≈ row3.T)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(2, 48, true)</code></pre><p>This is typically the best approach when you perform many simulations with the same weather, <em>e.g.</em> for model calibration, sensitivity analysis, or system optimization.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../weather-apis/">« Weather Data Sources</a><a class="docs-footer-nextpage" href="../API/">API »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Wednesday 18 February 2026 12:31">Wednesday 18 February 2026</span>. Using Julia version 1.12.5.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
