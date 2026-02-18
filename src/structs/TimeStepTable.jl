@@ -328,6 +328,10 @@ function update_schema_cache_for_new_rows!(ts::TimeStepTable, new_rows)
     return ts
 end
 
+@inline function find_column_index(ts::TimeStepTable, s::Symbol)
+    findfirst(==(s), getfield(ts, :names))
+end
+
 function Base.length(A::TimeStepTable{T}) where {T}
     length(getfield(A, :ts))
 end
@@ -383,8 +387,14 @@ function Base.setindex!(row::TimeStepRow, x, i)
 
     old_type = typeof(raw[i])
     setproperty!(raw, i, x)
-    new_type = typeof(raw[i])
-    old_type === new_type || invalidate_schema_cache!(ts)
+    if x isa old_type
+        return
+    end
+
+    cached = cache_ref[]
+    if isnothing(cached) || !(x isa cached.types[i])
+        invalidate_schema_cache!(ts)
+    end
 end
 
 function Base.setproperty!(row::TimeStepRow, nm::Symbol, x)
@@ -398,8 +408,15 @@ function Base.setproperty!(row::TimeStepRow, nm::Symbol, x)
 
     old_type = typeof(raw[nm])
     setproperty!(raw, nm, x)
-    new_type = typeof(raw[nm])
-    old_type === new_type || invalidate_schema_cache!(ts)
+    if x isa old_type
+        return
+    end
+
+    cached = cache_ref[]
+    col_ind = find_column_index(ts, nm)
+    if isnothing(cached) || isnothing(col_ind) || !(x isa cached.types[col_ind])
+        invalidate_schema_cache!(ts)
+    end
 end
 
 ##### Indexing and setting:
@@ -440,16 +457,20 @@ end
 # and then providing the values for the variable (must match the length).
 function Base.setproperty!(ts::TimeStepTable, s::Symbol, x)
     @assert length(x) == length(ts)
-    has_cached_schema = !isnothing(getfield(ts, :schema_cache)[])
+    col_ind = find_column_index(ts, s)
+    isnothing(col_ind) && throw(ArgumentError("Column $s does not exist in the table. Adding new columns is not supported."))
+
+    cached_schema = getfield(ts, :schema_cache)[]
+    has_cached_schema = !isnothing(cached_schema)
+    cached_col_type = has_cached_schema ? cached_schema.types[col_ind] : Any
     type_changed = false
 
     for (i, row) in enumerate(Tables.rows(ts))
         raw = row_struct(row)
         if has_cached_schema
-            old_type = typeof(raw[s])
-            setproperty!(raw, s, x[i])
-            new_type = typeof(raw[s])
-            type_changed |= old_type !== new_type
+            x_i = x[i]
+            type_changed |= !(x_i isa cached_col_type)
+            setproperty!(raw, s, x_i)
         else
             setproperty!(raw, s, x[i])
         end

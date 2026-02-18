@@ -141,4 +141,14 @@ end
     schm4 = Tables.schema(ts_mut)
     @test schm4 !== schm3
     @test schm4.types == (Float64,)
+
+    ts_mut.A = Any[1, 2.0]
+    schm5 = Tables.schema(ts_mut)
+    @test schm5.types[1] <: Union{Int64,Float64}
+    @test Union{Int64,Float64} <: schm5.types[1]
+    ts_mut[1, :].A = 3.0
+    schm6 = Tables.schema(ts_mut)
+    @test schm6 === schm5
+
+    @test_throws ArgumentError ts_mut.B = [1, 2]
 end
