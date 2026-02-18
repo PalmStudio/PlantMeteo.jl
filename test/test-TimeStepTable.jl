@@ -5,6 +5,13 @@ row_types = [
     ref_values
 ]
 
+mutable struct MutableSchemaRow
+    A::Any
+end
+Base.keys(::MutableSchemaRow) = (:A,)
+Base.getindex(r::MutableSchemaRow, ::Int) = r.A
+Base.getindex(r::MutableSchemaRow, s::Symbol) = getfield(r, s)
+
 for row_type in row_types
     @testset "Testing TimeStepTable{$(nameof(typeof(row_type)))}}" begin
         # row_type = row_types[2]
@@ -77,4 +84,87 @@ for row_type in row_types
         @test df.Rh == [0.65, 0.65]
         @test names(df) == [string.(keys(row_type))...]
     end
+end
+
+@testset "TimeStepTable schema inference" begin
+    ts_mixed = TimeStepTable([(A=nothing, B=1), (A=1.0, B=2)])
+    sch_mixed = Tables.schema(ts_mixed)
+    @test sch_mixed.names == (:A, :B)
+    @test sch_mixed.types == (Union{Nothing,Float64}, Int64)
+
+    ts_num = TimeStepTable([(A=1,), (A=2.0,)])
+    sch_num = Tables.schema(ts_num)
+    @test sch_num.names == (:A,)
+    @test sch_num.types == (Union{Int64,Float64},)
+
+    df_mixed = DataFrame(ts_mixed)
+    @test eltype(df_mixed.A) == Union{Nothing,Float64}
+end
+
+@testset "TimeStepTable schema cache invalidation" begin
+    ts_dict = TimeStepTable([Dict{Symbol,Any}(:A => 1), Dict{Symbol,Any}(:A => 2)])
+    sch1 = Tables.schema(ts_dict)
+    sch2 = Tables.schema(ts_dict)
+    @test sch1 === sch2
+    @test sch1.types == (Int64,)
+
+    push!(ts_dict, Dict(:A => 3))
+    sch3 = Tables.schema(ts_dict)
+    @test sch3 === sch2
+    @test sch3.types == (Int64,)
+
+    push!(ts_dict, Dict(:A => 3.0))
+    sch4 = Tables.schema(ts_dict)
+    @test sch4 !== sch3
+    @test sch4.types[1] <: Union{Float64,Int64}
+    @test Union{Float64,Int64} <: sch4.types[1]
+
+    append!(ts_dict, [Dict(:A => nothing)])
+    sch5 = Tables.schema(ts_dict)
+    @test sch5 !== sch4
+    @test sch5.types[1] <: Union{Nothing,Float64,Int64}
+    @test Union{Nothing,Float64,Int64} <: sch5.types[1]
+
+    ts_mut = TimeStepTable([MutableSchemaRow(1), MutableSchemaRow(2)])
+    schm1 = Tables.schema(ts_mut)
+    @test schm1.types == (Int64,)
+
+    ts_mut.A = [3, 4]
+    schm2 = Tables.schema(ts_mut)
+    @test schm2 === schm1
+
+    ts_mut[1, :].A = 5
+    schm3 = Tables.schema(ts_mut)
+    @test schm3 === schm2
+
+    ts_mut.A = [1.0, 2.0]
+    schm4 = Tables.schema(ts_mut)
+    @test schm4 !== schm3
+    @test schm4.types == (Float64,)
+
+    ts_mut.A = Any[1, 2.0]
+    schm5 = Tables.schema(ts_mut)
+    @test schm5.types[1] <: Union{Int64,Float64}
+    @test Union{Int64,Float64} <: schm5.types[1]
+    ts_mut[1, :].A = 3.0
+    schm6 = Tables.schema(ts_mut)
+    @test schm6 === schm5
+
+    ts_row = TimeStepTable([MutableSchemaRow(1), MutableSchemaRow(2)])
+    sch_row_1 = Tables.schema(ts_row)
+    @test sch_row_1.types == (Int64,)
+
+    # Different type via row update should invalidate cache, then schema should rebuild to a Union.
+    ts_row[1, :].A = 1.0
+    sch_row_2 = Tables.schema(ts_row)
+    @test sch_row_2 !== sch_row_1
+    @test sch_row_2.types[1] <: Union{Int64,Float64}
+    @test Union{Int64,Float64} <: sch_row_2.types[1]
+
+    # Once rebuilt, changing another row to an already allowed type should keep cache valid.
+    ts_row[2, :].A = 3.0
+    sch_row_3 = Tables.schema(ts_row)
+    @test sch_row_3 === sch_row_2
+
+    @test_throws ArgumentError ts_mut.B = [1, 2]
 end
