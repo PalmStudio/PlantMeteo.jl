@@ -145,6 +145,14 @@ Base.IndexStyle(::Type{<:TimeStepColumn}) = IndexLinear()
 
 @inline _row_get_value(row::AbstractDict, ::Int, col_name::Symbol) = row[col_name]
 @inline _row_get_value(row, col_ind::Int, ::Symbol) = row[col_ind]
+@inline function _row_set_value!(row::AbstractDict, ::Int, col_name::Symbol, x)
+    setindex!(row, x, col_name)
+    return nothing
+end
+@inline function _row_set_value!(row, col_ind::Int, col_name::Symbol, x)
+    setproperty!(row, col_name, x)
+    return nothing
+end
 
 @inline function Base.getindex(col::TimeStepColumn, i::Int)
     ts = getfield(col, :source)
@@ -329,7 +337,41 @@ function update_schema_cache_for_new_rows!(ts::TimeStepTable, new_rows)
 end
 
 @inline function find_column_index(ts::TimeStepTable, s::Symbol)
-    findfirst(==(s), getfield(ts, :names))
+    names_ = getfield(ts, :names)
+    @inbounds for i in eachindex(names_)
+        if names_[i] == s
+            return i
+        end
+    end
+    return nothing
+end
+
+@generated function set_column_values_nocache!(rows::Vector{T}, names_::NTuple{N,Symbol}, s::Symbol, x) where {T,N}
+    branches = Expr(:block)
+
+    for j in 1:N
+        set_expr = if T <: AbstractDict
+            :(setindex!(rows[i], x[i], names_[$j]))
+        else
+            :(setfield!(rows[i], $j, x[i]))
+        end
+
+        push!(branches.args, quote
+            if s === names_[$j]
+                @inbounds for i in eachindex(rows)
+                    $set_expr
+                end
+                return nothing
+            end
+        end)
+    end
+
+    push!(
+        branches.args,
+        :(throw(ArgumentError("Column $s does not exist in the table. Adding new columns is not supported.")))
+    )
+
+    return branches
 end
 
 function Base.length(A::TimeStepTable{T}) where {T}
@@ -379,14 +421,15 @@ Set the value of a variable in a `TimeStepRow` object.
 function Base.setindex!(row::TimeStepRow, x, i)
     ts = parent(row)
     raw = row_struct(row)
+    col_name = getfield(ts, :names)[i]
     cache_ref = getfield(ts, :schema_cache)
     if isnothing(cache_ref[])
-        setproperty!(raw, i, x)
+        _row_set_value!(raw, i, col_name, x)
         return
     end
 
     old_type = typeof(raw[i])
-    setproperty!(raw, i, x)
+    _row_set_value!(raw, i, col_name, x)
     if x isa old_type
         return
     end
@@ -406,6 +449,8 @@ function Base.setproperty!(row::TimeStepRow, nm::Symbol, x)
         return
     end
 
+    col_ind = find_column_index(ts, nm)
+    isnothing(col_ind) && throw(ArgumentError("Column $nm does not exist in the table."))
     old_type = typeof(raw[nm])
     setproperty!(raw, nm, x)
     if x isa old_type
@@ -413,8 +458,7 @@ function Base.setproperty!(row::TimeStepRow, nm::Symbol, x)
     end
 
     cached = cache_ref[]
-    col_ind = find_column_index(ts, nm)
-    if isnothing(cached) || isnothing(col_ind) || !(x isa cached.types[col_ind])
+    if isnothing(cached) || !(x isa cached.types[col_ind])
         invalidate_schema_cache!(ts)
     end
 end
@@ -457,23 +501,22 @@ end
 # and then providing the values for the variable (must match the length).
 function Base.setproperty!(ts::TimeStepTable, s::Symbol, x)
     @assert length(x) == length(ts)
+    names_ = getfield(ts, :names)
+    cached_schema = getfield(ts, :schema_cache)[]
+    rows = getfield(ts, :ts)
+    if isnothing(cached_schema)
+        set_column_values_nocache!(rows, names_, s, x)
+        return
+    end
+
     col_ind = find_column_index(ts, s)
     isnothing(col_ind) && throw(ArgumentError("Column $s does not exist in the table. Adding new columns is not supported."))
-
-    cached_schema = getfield(ts, :schema_cache)[]
-    has_cached_schema = !isnothing(cached_schema)
-    cached_col_type = has_cached_schema ? cached_schema.types[col_ind] : Any
+    cached_col_type = cached_schema.types[col_ind]
     type_changed = false
-
-    for (i, row) in enumerate(Tables.rows(ts))
-        raw = row_struct(row)
-        if has_cached_schema
-            x_i = x[i]
-            type_changed |= !(x_i isa cached_col_type)
-            setproperty!(raw, s, x_i)
-        else
-            setproperty!(raw, s, x[i])
-        end
+    @inbounds for i in eachindex(rows)
+        x_i = x[i]
+        type_changed |= !(x_i isa cached_col_type)
+        _row_set_value!(rows[i], col_ind, s, x_i)
     end
 
     if type_changed
