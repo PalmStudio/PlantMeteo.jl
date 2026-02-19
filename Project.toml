@@ -1,6 +1,6 @@
 name = "PlantMeteo"
 uuid = "4630fe09-e0fb-4da5-a846-781cb73437b6"
-version = "0.8.0"
+version = "0.8.1"
 authors = ["remi.vezy <VEZY@users.noreply.github.com> and contributors"]
 
 [deps]
