@@ -23,6 +23,7 @@ include("APIs/read_weather.jl")
 include("APIs/open-meteo.jl")
 include("computations/conversions.jl")
 include("checks/check_day_complete.jl")
+include("checks/timestep_intervals.jl")
 include("computations/to_daily.jl")
 include("computations/weather_sampling.jl")
 include("APIs/write_weather.jl")
@@ -36,6 +37,8 @@ export psychrometer_constant
 export rh_from_vpd, rh_from_e, vpd, vpd_from_e
 export metadata, metadatakeys
 export read_weather, write_weather
+export duration_seconds, positive_duration_seconds
+export row_datetime_interval, check_non_overlapping_timesteps, select_overlapping_timesteps
 export get_forecast
 export OpenMeteo, OpenMeteoUnits
 export get_weather
