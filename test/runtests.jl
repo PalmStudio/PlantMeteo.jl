@@ -17,6 +17,10 @@ using Documenter # for doctests
         include("test-read_weather.jl")
     end
 
+    @testset "timestep intervals" begin
+        include("test-timestep_intervals.jl")
+    end
+
     @testset "write_weather()" begin
         include("test-write_weather.jl")
     end

@@ -40,6 +40,38 @@ meteo = read_weather(
 (length(meteo), metadatakeys(meteo))
 ```
 
+### Robust Date Parsing for Legacy Files
+
+Some meteorological files encode the date only on the first row and leave it empty for following rows.
+`read_weather` can now try several date formats and forward-fill missing dates:
+
+```@example apis
+legacy = mktempdir() do tmp
+    path = joinpath(tmp, "legacy_meteo.csv")
+    write(path, """
+date;hour_start;hour_end;temperature;relativeHumidity;wind;clearness
+2016/06/12;08:30:00;09:00:00;25;60;1.0;0.6
+;09:00:00;09:30:00;25;60;1.0;0.6
+""")
+
+    read_weather(
+        path,
+        :temperature => :T,
+        :relativeHumidity => (x -> x ./ 100) => :Rh,
+        :wind => :Wind,
+        date_formats = (DateFormat("yyyy/mm/dd"), DateFormat("yyyy-mm-dd")),
+        forward_fill_date = true,
+    )
+end
+
+(legacy.date[1], legacy.date[2])
+```
+
+You can also validate chronology explicitly with:
+- [`row_datetime_interval`](@ref)
+- [`check_non_overlapping_timesteps`](@ref)
+- [`select_overlapping_timesteps`](@ref)
+
 ### Round-trip Export with `write_weather`
 
 Write a clean weather file for reuse, including metadata.

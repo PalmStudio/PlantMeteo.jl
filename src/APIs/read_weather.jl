@@ -2,8 +2,10 @@
     read_weather(
         file[,args...];
         date_format = DateFormat("yyyy-mm-ddTHH:MM:SS.s"),
+        date_formats = nothing,
         hour_format = DateFormat("HH:MM:SS"),
-        duration=nothing
+        duration = nothing,
+        forward_fill_date = false,
     )
 
 Read a meteo file. The meteo file is a CSV, and optionnaly with metadata in a header formatted
@@ -26,10 +28,12 @@ from the other variables. Please check that all variables have the same units as
 - `file::String`: path to a meteo file
 - `args...`: A list of arguments to transform the table. See above to see the possible forms.
 - `date_format = DateFormat("yyyy-mm-ddTHH:MM:SS.s")`: the format for the `DateTime` columns
+- `date_formats = nothing`: optional fallback date formats tried after `date_format`
 - `hour_format = DateFormat("HH:MM:SS")`: the format for the `Time` columns (*e.g.* `hour_start`)
 - `duration`: a function to parse the `duration` column if present in the file. Usually `Dates.Day` or `Dates.Minute`.
 If the column is absent, the duration will be computed using the `hour_format` and the `hour_start` and `hour_end` columns
 along with the `date` column.
+- `forward_fill_date = false`: if `true`, missing dates are replaced by the previous parsed date.
 
 # Examples
 
@@ -51,8 +55,10 @@ meteo = read_weather(
 function read_weather(
     file, args...;
     date_format=Dates.DateFormat("yyyy-mm-ddTHH:MM:SS.s"),
+    date_formats=nothing,
     hour_format=Dates.DateFormat("HH:MM:SS"),
-    duration=nothing
+    duration=nothing,
+    forward_fill_date::Bool=false,
 )
 
     arguments = (args...,)
@@ -61,7 +67,8 @@ function read_weather(
     # Apply the transformations eventually given by the user:
     data = transform_columns(data, arguments...)
 
-    data = set_column(data, :date, compute_date(data, date_format, hour_format))
+    date = _compute_date_with_fallback(data, date_format, date_formats, hour_format; forward_fill_date=forward_fill_date)
+    data = set_column(data, :date, date)
     data = set_column(data, :duration, compute_duration(data, hour_format, duration))
 
     # Rename the columns to the PlantMeteo convention (if any):
@@ -96,6 +103,85 @@ function read_weather(
     return Weather(data, (; zip(Symbol.(keys(metadata_)), values(metadata_))...))
 end
 
+function _compute_date_with_fallback(data, date_format, date_formats, hour_format; forward_fill_date::Bool=false)
+    formats = Dates.DateFormat[date_format]
+    if date_formats !== nothing
+        if date_formats isa Dates.DateFormat
+            push!(formats, date_formats)
+        else
+            append!(formats, collect(date_formats))
+        end
+    end
+
+    # Keep first occurrence order while removing duplicates.
+    uniq_formats = Dates.DateFormat[]
+    seen = Set{String}()
+    for fmt in formats
+        k = string(fmt)
+        k in seen && continue
+        push!(seen, k)
+        push!(uniq_formats, fmt)
+    end
+
+    last_err = nothing
+    for fmt in uniq_formats
+        try
+            return compute_date(data, fmt, hour_format; forward_fill_date=forward_fill_date)
+        catch err
+            last_err = err
+        end
+    end
+
+    last_err === nothing && error("No date format provided.")
+    throw(last_err)
+end
+
+function _parse_date_cell(v, date_format)
+    v === missing && return missing
+    if v isa Dates.DateTime
+        return Dates.Date(v)
+    elseif v isa Dates.Date
+        return v
+    end
+    s = strip(string(v))
+    (isempty(s) || lowercase(s) == "missing") && return missing
+    return Dates.Date(s, date_format)
+end
+
+function _parse_date_column(date_col, date_format)
+    out = Vector{Union{Missing,Dates.Date}}(undef, length(date_col))
+    for i in eachindex(date_col)
+        out[i] = _parse_date_cell(date_col[i], date_format)
+    end
+    return out
+end
+
+function _combine_date_and_hour(date_col, hour_col, hour_format)
+    out = Vector{Union{Missing,Dates.DateTime}}(undef, length(date_col))
+    for i in eachindex(date_col)
+        d = date_col[i]
+        if d === missing
+            out[i] = missing
+        else
+            out[i] = d + parse_hour(hour_col[i], hour_format)
+        end
+    end
+    return out
+end
+
+function _forward_fill_dates(date_col)
+    out = collect(date_col)
+    last_seen = nothing
+    for i in eachindex(out)
+        if out[i] === missing
+            last_seen === nothing || (out[i] = last_seen)
+        else
+            last_seen = out[i]
+        end
+    end
+    return out
+end
+
 function read_weather_(file)
     yaml_data = open(file, "r") do io
         yaml_data = ""
@@ -120,7 +206,7 @@ function read_weather_(file)
 end
 
 """
-    compute_date(data, date_format, hour_format)
+    compute_date(data, date_format, hour_format; forward_fill_date=false)
 
 Compute the `date` column depending on several cases:
 
@@ -134,18 +220,22 @@ Compute the `date` column depending on several cases:
 - `data`: any `Tables.jl` compatible table, such as a `DataFrame`
 - `date_format`: a `DateFormat` to parse the `date` column if it is a `String`
 - `hour_format`: a `DateFormat` to parse the `hour_start` column if it is a `String`
+- `forward_fill_date`: when `true`, missing dates are filled with the previous non-missing date
 """
 function compute_date(
     data,
     date_format=Dates.DateFormat("yyyy-mm-ddTHH:MM:SS.s"),
     hour_format=Dates.DateFormat("HH:MM:SS"),
+    ;
+    forward_fill_date::Bool=false,
 )
+    hasproperty(data, :date) || error("The `date` column is missing from the weather data.")
 
-    if hasproperty(data, :date) && !(typeof(data.date[1]) == Dates.DateTime || typeof(data.date[1]) == Dates.Date)
-        # There's a "date" column but it is not a DateTime or a Date
-        # Trying to parse it with the user-defined format:
+    date = data.date
+    if !(typeof(date[1]) == Dates.DateTime || typeof(date[1]) == Dates.Date)
+        # There's a "date" column but it is not a DateTime or a Date.
         date = try
-            Dates.Date.(data.date, date_format)
+            _parse_date_column(date, date_format)
         catch e
             error(
                 "The values in the `date` column cannot be parsed.",
@@ -153,30 +243,24 @@ function compute_date(
                 e
             )
         end
+    end
 
-        if typeof(date[1]) == Dates.Date && hasproperty(data, :hour_start)
-            # The `date` column is of Date type, we have to add the Time if there's a column named
-            # `hour_start`:
-            if typeof(data.hour_start[1]) != Dates.Time
-                # There's a "hour_start" column but it is not of Time type
-                # If it is a String, it did not parse at reading with CSV, so trying to use
-                # the user-defined format:
-                date = try
-                    # Adding the Time to the Date to make a DateTime:
-                    date .+ Dates.Time.(data.hour_start, hour_format)
-                catch e
-                    error(
-                        "The values in the `hour_start` column cannot be parsed.",
-                        " Please check the format of the hours or provide the format as argument.",
-                        e
-                    )
-                end
-            else
-                date = date .+ data.hour_start
+    forward_fill_date && (date = _forward_fill_dates(date))
+
+    first_idx = findfirst(x -> x !== missing, date)
+    if first_idx !== nothing && hasproperty(data, :hour_start)
+        first_val = date[first_idx]
+        if first_val isa Dates.Date
+            date = try
+                _combine_date_and_hour(date, data.hour_start, hour_format)
+            catch e
+                error(
+                    "The values in the `hour_start` column cannot be parsed.",
+                    " Please check the format of the hours or provide the format as argument.",
+                    e
+                )
             end
         end
-    else
-        return data.date
     end
 
     return date
