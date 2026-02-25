@@ -69,6 +69,12 @@ using Dates
 
     # Symbol reducers are intentionally unsupported in the new API.
     @test_throws "Unsupported reducer value" sample_weather(prepared, 3; window=window2, transforms=(; T=:weighted_mean))
+
+    # Generic duration-aware reducer for non-radiative integrations.
+    reducer = DurationSumReducer()
+    @test reducer([1.0, 2.0], [60.0, 120.0]) == 300.0
+    @test reducer([1.0, 2.0], [Dates.Minute(1), Dates.Minute(2)]) == 300.0
+    @test_throws "`DurationSumReducer` requires durations" reducer([1.0, 2.0])
 end
 
 @testset "calendar window sampling" begin
