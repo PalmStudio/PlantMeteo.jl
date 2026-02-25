@@ -61,6 +61,14 @@ Reducer returning last value in the window.
 struct LastReducer <: AbstractTimeReducer end
 
 """
+    DurationSumReducer()
+
+Integrate values over durations (seconds) with no unit conversion.
+Returns `sum(values .* durations)`.
+"""
+struct DurationSumReducer <: AbstractTimeReducer end
+
+"""
     RadiationEnergy()
 
 Integrate flux values (W m-2) over durations (seconds) into MJ m-2.
@@ -176,6 +184,30 @@ Return last sampled value.
 """
 (::LastReducer)(vals::AbstractVector) = last(vals)
 (::LastReducer)(vals::AbstractVector, durations::AbstractVector{<:Real}) = last(vals)
+
+"""
+    DurationSumReducer()(vals, durations)
+
+Integrate values over durations without applying any extra scaling factor.
+Durations are interpreted as seconds when given as `Real`, or converted to
+seconds when given as `Dates.TimePeriod`.
+"""
+function (::DurationSumReducer)(vals::AbstractVector{<:Real}, durations::AbstractVector{<:Real})
+    return sum(v * d for (v, d) in zip(vals, durations))
+end
+
+function (::DurationSumReducer)(vals::AbstractVector{<:Real}, durations::AbstractVector{<:Dates.TimePeriod})
+    return sum(v * Dates.toms(d) * 1.0e-3 for (v, d) in zip(vals, durations))
+end
+
+"""
+    DurationSumReducer()(vals)
+
+Erroring fallback for duration-free reductions.
+"""
+function (::DurationSumReducer)(vals::AbstractVector{<:Real})
+    error("`DurationSumReducer` requires durations. Use it with `(vals, durations)`.")
+end
 
 """
     RadiationEnergy()(vals, durations)
