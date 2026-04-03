@@ -101,6 +101,39 @@ const OPENMETEO_MODELS = [
     "meteofrance_arome_france", "meteofrance_arome_france_hd"
 ]
 
+const OPENMETEO_RETRYABLE_STATUS_CODES = (408, 429, 500, 502, 503, 504)
+const OPENMETEO_DEFAULT_RETRIES = 2
+const OPENMETEO_DEFAULT_RETRY_DELAY_SECONDS = 0.5
+
+struct OpenMeteoRequestError <: Exception
+    segment::String
+    start_date::String
+    end_date::String
+    url::String
+    attempts::Int
+    reason::String
+end
+
+function Base.showerror(io::IO, err::OpenMeteoRequestError)
+    print(
+        io,
+        "Open-Meteo ",
+        err.segment,
+        " request failed for ",
+        err.start_date,
+        " to ",
+        err.end_date,
+        " after ",
+        err.attempts,
+        " attempt",
+        err.attempts == 1 ? "" : "s",
+        ": ",
+        err.reason,
+        ". URL: ",
+        err.url
+    )
+end
+
 function OpenMeteo(;
     vars=DEFAULT_OPENMETEO_HOURLY,
     forecast_server="https://api.open-meteo.com/v1/forecast",
@@ -164,7 +197,16 @@ function get_forecast(params::OpenMeteo, lat, lon, period; verbose=true, kwargs.
 
         max_date = min(archive_date, period[end])
 
-        atms_archive, metadata = fetch_openmeteo(params.historical_server, lat, lon, start_date, max_date, params)
+        atms_archive, metadata = fetch_openmeteo(
+            params.historical_server,
+            lat,
+            lon,
+            start_date,
+            max_date,
+            params;
+            segment="archive",
+            kwargs...
+        )
 
         # If we need newer data, then restart from the day after archive_date
         start_date = Dates.format(archive_date + Dates.Day(1), "yyyy-mm-dd")
@@ -186,7 +228,9 @@ function get_forecast(params::OpenMeteo, lat, lon, period; verbose=true, kwargs.
             lon,
             historical_forecast_start_date,
             historical_forecast_end_date,
-            params
+            params;
+            segment="historical forecast",
+            kwargs...
         )
 
         start_date = Dates.format(historical_forecast_max + Dates.Day(1), "yyyy-mm-dd")
@@ -195,7 +239,16 @@ function get_forecast(params::OpenMeteo, lat, lon, period; verbose=true, kwargs.
     atms_forecast = Atmosphere[]
     if period[end] > historical_forecast_end
         # Get the forecast from open-meteo.com
-        atms_forecast, metadata = fetch_openmeteo(params.forecast_server, lat, lon, start_date, end_date, params)
+        atms_forecast, metadata = fetch_openmeteo(
+            params.forecast_server,
+            lat,
+            lon,
+            start_date,
+            end_date,
+            params;
+            segment="forecast",
+            kwargs...
+        )
     end
 
     tst = TimeStepTable(vcat(atms_archive, atms_historical_forecast, atms_forecast), metadata)
@@ -212,7 +265,19 @@ Fetches the weather forecast from OpenMeteo.com and returns a tuple of:
 - a `NamedTuple` of metadata (e.g. `elevation`, `timezone`, `units`...)
 
 """
-function fetch_openmeteo(url, lat, lon, start_date, end_date, params::T) where {T<:OpenMeteo}
+function fetch_openmeteo(
+    url,
+    lat,
+    lon,
+    start_date,
+    end_date,
+    params::T;
+    segment="forecast",
+    request_get=HTTP.get,
+    retries=OPENMETEO_DEFAULT_RETRIES,
+    retry_delay=OPENMETEO_DEFAULT_RETRY_DELAY_SECONDS,
+    sleep_fn=sleep,
+) where {T<:OpenMeteo}
     # Format API parameters:
     API_params = (
         latitude=lat,
@@ -232,8 +297,25 @@ function fetch_openmeteo(url, lat, lon, start_date, end_date, params::T) where {
 
     url_archive = string(url, "?", API_params)
 
-    data = HTTP.get(url_archive)
-    data = JSON.parse(String(data.body))
+    response, attempts = openmeteo_get_with_retry(
+        url_archive;
+        segment=segment,
+        start_date=start_date,
+        end_date=end_date,
+        request_get=request_get,
+        retries=retries,
+        retry_delay=retry_delay,
+        sleep_fn=sleep_fn
+    )
+
+    data = parse_openmeteo_response(
+        response,
+        url_archive,
+        segment,
+        start_date,
+        end_date,
+        attempts
+    )
 
     return (
         format_openmeteo!(data),
@@ -247,6 +329,135 @@ function fetch_openmeteo(url, lat, lon, start_date, end_date, params::T) where {
         )
     )
 end
+
+function openmeteo_get_with_retry(
+    url;
+    segment,
+    start_date,
+    end_date,
+    request_get,
+    retries,
+    retry_delay,
+    sleep_fn,
+)
+    attempts = retries + 1
+    last_reason = "request did not complete"
+
+    for attempt in 1:attempts
+        try
+            response = request_get(url; status_exception=false)
+            if response.status in OPENMETEO_RETRYABLE_STATUS_CODES
+                last_reason = "HTTP $(response.status)"
+                attempt < attempts && sleep_fn(retry_delay * attempt)
+                continue
+            elseif response.status < 200 || response.status >= 300
+                throw(OpenMeteoRequestError(
+                    segment,
+                    start_date,
+                    end_date,
+                    url,
+                    attempt,
+                    "HTTP $(response.status)"
+                ))
+            end
+
+            return response, attempt
+        catch err
+            transient = is_transient_openmeteo_error(err)
+            last_reason = openmeteo_error_reason(err)
+
+            if transient && attempt < attempts
+                sleep_fn(retry_delay * attempt)
+                continue
+            end
+
+            if transient
+                throw(OpenMeteoRequestError(segment, start_date, end_date, url, attempt, last_reason))
+            end
+
+            rethrow()
+        end
+    end
+
+    throw(OpenMeteoRequestError(segment, start_date, end_date, url, attempts, last_reason))
+end
+
+function parse_openmeteo_response(response, url, segment, start_date, end_date, attempts)
+    data = try
+        JSON.parse(String(response.body))
+    catch err
+        throw(OpenMeteoRequestError(
+            segment,
+            start_date,
+            end_date,
+            url,
+            attempts,
+            "invalid JSON response ($(typeof(err)))"
+        ))
+    end
+
+    validate_openmeteo_response(data, url, segment, start_date, end_date, attempts)
+
+    return data
+end
+
+function validate_openmeteo_response(data, url, segment, start_date, end_date, attempts)
+    required_top_level = ("latitude", "longitude", "elevation", "timezone", "hourly_units", "timezone_abbreviation", "hourly")
+    for key in required_top_level
+        haskey(data, key) || throw(OpenMeteoRequestError(
+            segment,
+            start_date,
+            end_date,
+            url,
+            attempts,
+            "response is missing key \"$key\""
+        ))
+    end
+
+    hourly = data["hourly"]
+    hourly isa AbstractDict || throw(OpenMeteoRequestError(
+        segment,
+        start_date,
+        end_date,
+        url,
+        attempts,
+        "response key \"hourly\" is not an object"
+    ))
+
+    required_hourly = (
+        "time",
+        "surface_pressure",
+        "windspeed_10m",
+        "temperature_2m",
+        "relativehumidity_2m",
+        "precipitation",
+        "shortwave_radiation",
+        "direct_radiation",
+        "diffuse_radiation",
+    )
+    for key in required_hourly
+        haskey(hourly, key) || throw(OpenMeteoRequestError(
+            segment,
+            start_date,
+            end_date,
+            url,
+            attempts,
+            "response hourly payload is missing key \"$key\""
+        ))
+    end
+end
+
+is_transient_openmeteo_error(::HTTP.TimeoutError) = true
+is_transient_openmeteo_error(::HTTP.ConnectError) = true
+is_transient_openmeteo_error(err::HTTP.RequestError) = is_transient_openmeteo_error(err.error)
+is_transient_openmeteo_error(err::HTTP.StatusError) = err.status in OPENMETEO_RETRYABLE_STATUS_CODES
+is_transient_openmeteo_error(err) = err isa EOFError || err isa Base.IOError
+
+openmeteo_error_reason(err::HTTP.TimeoutError) = "request timed out"
+openmeteo_error_reason(err::HTTP.ConnectError) = "connection failed: $(err.error)"
+openmeteo_error_reason(err::HTTP.RequestError) = openmeteo_error_reason(err.error)
+openmeteo_error_reason(err::HTTP.StatusError) = "HTTP $(err.status)"
+openmeteo_error_reason(err) = sprint(showerror, err)
 
 """
     format_openmeteo(data)
