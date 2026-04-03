@@ -1,21 +1,10 @@
 """
-    OpenMeteoUnits(temperature_unit, windspeed_unit, precipitation_unit)
-    OpenMeteoUnits(;temperature_unit="celsius", windspeed_unit="ms", precipitation_unit="mm")
-    
-A type that defines the units used for the variabels when calling the [open-meteo.com](https://open-meteo.com/) API.
+    OpenMeteoUnits(...)
 
-# Arguments
+Unit configuration passed to [`OpenMeteo`](@ref).
 
-- `temperature_unit`: the temperature unit, can be "celsius" or "fahrenheit". Default to "celsius".
-- `windspeed_unit`: the windspeed unit, can be "ms", "kmh", "mph", or "kn". Default to "ms".
-- `precipitation_unit`: the precipitation unit, can be "mm" or "inch". Default to "mm".
-
-# Examples
-    
-```jldoctest
-julia> units = OpenMeteoUnits("celsius", "ms", "mm")
-OpenMeteoUnits("celsius", "ms", "mm")
-```
+Use this when you want to control how temperature, wind speed, and precipitation are requested from
+Open-Meteo before PlantMeteo converts the result into a weather table.
 """
 struct OpenMeteoUnits
     temperature_unit
@@ -39,72 +28,45 @@ end
 
 
 """
-    OpenMeteo()
-    OpenMeteo(
-        vars=PlantMeteo.DEFAULT_OPENMETEO_HOURLY,
-        forecast_server="https://api.open-meteo.com/v1/forecast",
-        historical_forecast_server="https://historical-forecast-api.open-meteo.com/v1/forecast",
-        historical_server="https://archive-api.open-meteo.com/v1/era5",
-        start_archive=Dates.Date(2022, 1, 1) - Dates.today(),
-        units=OpenMeteoUnits(),
-        timezone="UTC",
-        models=["best_match"]
-    )
+    OpenMeteo(; kwargs...)
 
-A type that defines the [open-meteo.com](https://open-meteo.com/) API. 
-No need of an API key as it is free. Please keep in mind that the API
-is distributed under the AGPL license, that it
-is not free for commercial use, and that you should use it responsibly.
+Built-in PlantMeteo backend for the [Open-Meteo](https://open-meteo.com/) API.
 
-# Notes
+Use `OpenMeteo()` with [`get_weather`](@ref) when you want the fastest path from coordinates and
+dates to a usable weather table. PlantMeteo uses Open-Meteo's forecast endpoint for recent/future
+periods, a historical forecast endpoint for recent past periods, and its ERA5-based archive endpoint
+for older periods. That makes the same interface practical for both short-term forecasts and
+retrospective runs.
 
-The API wrapper provided by PlantMeteo is only working for the hourly data as daily data is missing 
-some variables. The API wrapper is also not working for the "soil" variables as they are not consistant
-between forecast and historical data.
+# Why it is useful
 
-# See also
+- no API-specific glue code in your modeling project
+- hourly weather variables behind one backend
+- recent forecast data and older historical data through the same interface
 
-[`to_daily`](@ref)
+# Important caveats
 
-# Arguments
+- calls require network access
+- forecast, historical forecast, and archive data may differ in source and resolution
+- usage terms should be checked for your real use case, especially commercial use
 
-- `vars`: the variables needed, see [here](https://open-meteo.com/en/docs).
-- `forecast_server`: the server to use for the forecast, see 
-[here](https://open-meteo.com/en/docs). Default to `https://api.open-meteo.com/v1/forecast`.
-- `historical_forecast_server`: the server to use for recent historical forecast data, see
-[here](https://open-meteo.com/en/docs/historical-forecast-api). Default to `https://historical-forecast-api.open-meteo.com/v1/forecast`.
-- `historical_server`: the server to use for the historical data, see 
-[here](https://open-meteo.com/en/docs). Default to `https://archive-api.open-meteo.com/v1/era5`.
-- `start_archive::Dates.Day`: the first day on which we have to get data from the historical archive instead of the historical forecast server.
-The default tracks `2022-01-01`, matching Open-Meteo's current historical forecast availability for recent years.
-- `units::OpenMeteoUnits`: the units used for the variables, see [`OpenMeteoUnits`](@ref).
-- `timezone`: the timezone used for the data, see [the list here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). 
-Default to "UTC". This parameter is not checked, so be careful when using it.
-- `models`: the models to use for the forecast. Default to `"["best_match"]"`. See [`OPENMETEO_MODELS`](@ref) for more details.
+# Key arguments
 
-# Troubleshooting
+- `vars`: Open-Meteo hourly variables to request.
+- `start_archive`: cutoff deciding when PlantMeteo switches to the archive endpoint.
+- `units`: unit configuration, see [`OpenMeteoUnits`](@ref).
+- `timezone`: timezone requested from Open-Meteo.
+- `models`: forecast models exposed by Open-Meteo.
 
-If you need to force more dates onto the archival ERA5 dataset, decrease the value of `start_archive`.
+# Example
 
-# Details
+```julia
+using PlantMeteo, Dates
 
-The default variables are: "temperature_2m", "relativehumidity_2m", "precipitation", "surface_pressure", "windspeed_10m",
-"shortwave_radiation", "direct_radiation", "diffuse_radiation".
-
-Note that we don't download: "soil_temperature_0cm", "soil_temperature_6cm", "soil_temperature_18cm", "soil_temperature_54cm",
-"soil_moisture_0_1cm", "soil_moisture_1_3cm", "soil_moisture_3_9cm", "soil_moisture_9_27cm" and "soil_moisture_27_81cm" 
-by default as they are not consistant between forecast and hystorical data.
-
-# Sources 
-
-- [Open-Meteo.com](https://open-meteo.com/), under Attribution 
-4.0 International (CC BY 4.0).
-- Copernicus Climate Change Service information 2022 (Hersbach et al., 2018).
-
-Hersbach, H., Bell, B., Berrisford, P., Biavati, G., Horányi, A., Muñoz Sabater, J., Nicolas, J., 
-Peubey, C., Radu, R., Rozum, I., Schepers, D., Simmons, A., Soci, C., Dee, D., Thépaut, J-N. (2018): 
-ERA5 hourly data on single levels from 1959 to present. 
-Copernicus Climate Change Service (C3S) Climate Data Store (CDS). (Updated daily), 10.24381/cds.adbb2d47
+api = OpenMeteo(timezone="UTC", models=["best_match"])
+period = Date(2025, 7, 1):Day(1):Date(2025, 7, 3)
+weather = get_weather(48.8566, 2.3522, period; api=api)
+```
 """
 struct OpenMeteo <: AbstractAPI
     vars::Vector{String}
@@ -165,28 +127,12 @@ function OpenMeteo(;
 end
 
 """
-    get_forecast(params::OpenMeteo, lat, lon, period; verbose=true)
+    get_forecast(params::OpenMeteo, lat, lon, period; verbose=true, kwargs...)
 
-A function that returns the weather forecast from OpenMeteo.com
+Live Open-Meteo request used internally by [`get_weather`](@ref).
 
-# Arguments
-
-- `lat`: Latitude of the location
-- `lon`: Longitude of the location
-- `period::Union{StepRange{Date, Day}, Vector{Dates.Date}}`: Period of the forecast
-- `verbose`: If `true`, print more information in case of errors or warnings.
-- `kwargs`: Additional keyword arguments passed to [`get_forecast`](@ref) (not used in this method).
-
-# Examples
-
-```julia
-using PlantMeteo, Dates
-lat = 48.8566
-lon = 2.3522
-period = [Dates.today(), Dates.today()+Dates.Day(3)]
-params = OpenMeteo()
-get_forecast(params, lat, lon, period)
-```
+This method returns a `TimeStepTable{Atmosphere}` built from Open-Meteo responses. Most users
+should call [`get_weather`](@ref) rather than invoking `get_forecast` directly.
 """
 function get_forecast(params::OpenMeteo, lat, lon, period; verbose=true, kwargs...)
 
