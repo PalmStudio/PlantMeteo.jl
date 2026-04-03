@@ -43,10 +43,12 @@ end
     OpenMeteo(
         vars=PlantMeteo.DEFAULT_OPENMETEO_HOURLY,
         forecast_server="https://api.open-meteo.com/v1/forecast",
+        historical_forecast_server="https://historical-forecast-api.open-meteo.com/v1/forecast",
         historical_server="https://archive-api.open-meteo.com/v1/era5",
+        start_archive=Dates.Date(2022, 1, 1) - Dates.today(),
         units=OpenMeteoUnits(),
         timezone="UTC",
-        models=["auto"]
+        models=["best_match"]
     )
 
 A type that defines the [open-meteo.com](https://open-meteo.com/) API. 
@@ -69,10 +71,12 @@ between forecast and historical data.
 - `vars`: the variables needed, see [here](https://open-meteo.com/en/docs).
 - `forecast_server`: the server to use for the forecast, see 
 [here](https://open-meteo.com/en/docs). Default to `https://api.open-meteo.com/v1/forecast`.
+- `historical_forecast_server`: the server to use for recent historical forecast data, see
+[here](https://open-meteo.com/en/docs/historical-forecast-api). Default to `https://historical-forecast-api.open-meteo.com/v1/forecast`.
 - `historical_server`: the server to use for the historical data, see 
 [here](https://open-meteo.com/en/docs). Default to `https://archive-api.open-meteo.com/v1/era5`.
-- `start_archive::Dates.Day`: the first day on which we have to get data from the historical archive instead of the forecast server, 
-data is at 25km resolution in the archive. Default to -150 days.
+- `start_archive::Dates.Day`: the first day on which we have to get data from the historical archive instead of the historical forecast server.
+The default tracks `2022-01-01`, matching Open-Meteo's current historical forecast availability for recent years.
 - `units::OpenMeteoUnits`: the units used for the variables, see [`OpenMeteoUnits`](@ref).
 - `timezone`: the timezone used for the data, see [the list here](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). 
 Default to "UTC". This parameter is not checked, so be careful when using it.
@@ -80,8 +84,7 @@ Default to "UTC". This parameter is not checked, so be careful when using it.
 
 # Troubleshooting
 
-If you get an error when calling the API, try to decrease the value of `start_archive` to *e.g.*. 100 days before 
-today (`-Dates.Day(100)`).
+If you need to force more dates onto the archival ERA5 dataset, decrease the value of `start_archive`.
 
 # Details
 
@@ -106,6 +109,7 @@ Copernicus Climate Change Service (C3S) Climate Data Store (CDS). (Updated daily
 struct OpenMeteo <: AbstractAPI
     vars::Vector{String}
     forecast_server::String
+    historical_forecast_server::String
     historical_server::String
     start_archive::Dates.Day
     units::OpenMeteoUnits
@@ -138,8 +142,9 @@ const OPENMETEO_MODELS = [
 function OpenMeteo(;
     vars=DEFAULT_OPENMETEO_HOURLY,
     forecast_server="https://api.open-meteo.com/v1/forecast",
+    historical_forecast_server="https://historical-forecast-api.open-meteo.com/v1/forecast",
     historical_server="https://archive-api.open-meteo.com/v1/era5",
-    start_archive=-Dates.Day(150),
+    start_archive=Dates.Date(2022, 1, 1) - Dates.today(),
     units=OpenMeteoUnits(),
     timezone="UTC",
     models=["best_match"]
@@ -156,7 +161,7 @@ function OpenMeteo(;
         @assert i in OPENMETEO_MODELS "The model $i is not available. See OPENMETEO_MODELS for more details."
     end
 
-    OpenMeteo(vars, forecast_server, historical_server, start_archive, units, timezone, models)
+    OpenMeteo(vars, forecast_server, historical_forecast_server, historical_server, start_archive, units, timezone, models)
 end
 
 """
@@ -199,30 +204,55 @@ function get_forecast(params::OpenMeteo, lat, lon, period; verbose=true, kwargs.
         )
     end
 
-    # The ~1km scale forecast API history does not go beyond ~170 days before today (and it can change...)
-    archive_date = Dates.today() + Dates.Day(params.start_archive) - Dates.Day(1)
+    archive_date = Dates.today() + params.start_archive - Dates.Day(1)
     atms_archive = Atmosphere[]
+    atms_historical_forecast = Atmosphere[]
+    metadata = nothing
+
+    historical_forecast_end = Dates.today() - Dates.Day(1)
 
     if period[1] <= archive_date
-        verbose && @info """Open-Meteo.com "forecast" data does not go beyond $(params.start_archive) ($archive_date).
-        Fetching Era5 data for previous dates (0.25° resolution, ~25-30km).        
+        verbose && @info """Fetching Open-Meteo archive data through $archive_date.
+        Older dates use ERA5 data (~25-30km resolution).        
         """
 
         max_date = min(archive_date, period[end])
 
         atms_archive, metadata = fetch_openmeteo(params.historical_server, lat, lon, start_date, max_date, params)
 
-        # If we need "forecast" data, then we restart from the day after archive_date
+        # If we need newer data, then restart from the day after archive_date
         start_date = Dates.format(archive_date + Dates.Day(1), "yyyy-mm-dd")
     end
 
+    if period[end] > archive_date && period[1] <= historical_forecast_end
+        verbose && @info """Fetching Open-Meteo historical forecast data through $historical_forecast_end.
+        Recent past dates use archived high-resolution forecast data.        
+        """
+
+        historical_forecast_start = max(period[1], archive_date + Dates.Day(1))
+        historical_forecast_max = min(historical_forecast_end, period[end])
+        historical_forecast_start_date = Dates.format(historical_forecast_start, "yyyy-mm-dd")
+        historical_forecast_end_date = Dates.format(historical_forecast_max, "yyyy-mm-dd")
+
+        atms_historical_forecast, metadata = fetch_openmeteo(
+            params.historical_forecast_server,
+            lat,
+            lon,
+            historical_forecast_start_date,
+            historical_forecast_end_date,
+            params
+        )
+
+        start_date = Dates.format(historical_forecast_max + Dates.Day(1), "yyyy-mm-dd")
+    end
+
     atms_forecast = Atmosphere[]
-    if period[end] > archive_date
+    if period[end] > historical_forecast_end
         # Get the forecast from open-meteo.com
         atms_forecast, metadata = fetch_openmeteo(params.forecast_server, lat, lon, start_date, end_date, params)
     end
 
-    tst = TimeStepTable(vcat(atms_archive, atms_forecast), metadata)
+    tst = TimeStepTable(vcat(atms_archive, atms_historical_forecast, atms_forecast), metadata)
 
     return tst
 end
