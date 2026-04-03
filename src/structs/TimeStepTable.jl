@@ -676,6 +676,43 @@ function Base.append!(ts::TimeStepTable, x)
     update_schema_cache_for_new_rows!(ts, x)
 end
 
+@inline function limited_display_row_count(io::IO)
+    rows, _ = displaysize(io)
+    # Leave room for title, borders, header, and optional omission/metadata lines.
+    return max(rows - 8, 1)
+end
+
+function limited_display_preview(t::TimeStepTable, io::IO)
+    total_rows = length(t)
+    shown_rows = limited_display_row_count(io)
+    if total_rows <= shown_rows
+        indices = collect(1:total_rows)
+        return indices, indices, shown_rows, 0
+    end
+
+    head_rows = max(cld(shown_rows, 2), 1)
+    tail_rows = shown_rows - head_rows
+    if (shown_rows > 1) && (tail_rows == 0)
+        head_rows -= 1
+        tail_rows = 1
+    end
+
+    gap_row = min(head_rows + 1, total_rows)
+    preview_indices = collect(1:head_rows)
+    append!(preview_indices, (gap_row, gap_row))
+    if tail_rows > 0
+        append!(preview_indices, total_rows - tail_rows + 1:total_rows)
+    end
+
+    preview_row_labels = collect(1:head_rows)
+    append!(preview_row_labels, (gap_row, gap_row))
+    if tail_rows > 0
+        append!(preview_row_labels, total_rows - tail_rows + 1:total_rows)
+    end
+
+    return preview_indices, preview_row_labels, shown_rows, total_rows - shown_rows
+end
+
 
 function show_ts(t::TimeStepTable{T}, io, io_type) where {T}
     length(t) == 0 && return
@@ -699,17 +736,41 @@ function show_ts(t::TimeStepTable{T}, io, io_type) where {T}
         t_style = PrettyTables.TextTableStyle(; table_border=Crayons.crayon"red")
     end
 
+    table_to_show = t
+    row_labels = 1:length(t)
+    omitted_rows = 0
+    max_rows = -1
+    vertical_crop_mode = :bottom
+    fit_table_in_display_vertically = true
+    show_omitted_cell_summary = true
+    if io_type == :text && get(io, :limit, false)
+        preview_indices, preview_row_labels, max_rows, omitted_rows = limited_display_preview(t, io)
+        row_labels = preview_row_labels
+        table_to_show = omitted_rows == 0 ? t : t[preview_indices]
+        vertical_crop_mode = :middle
+        fit_table_in_display_vertically = false
+        show_omitted_cell_summary = false
+    end
+
     PrettyTables.pretty_table(
-        io, t; backend=io_type,
+        io, table_to_show; backend=io_type,
         title="TimeStepTable{$(T_string)}($(length(t)) x $(length(getfield(t,:names)))):",
         table_format=t_format,
         row_number_column_label="Step",
-        row_labels=1:length(t),
-        vertical_crop_mode=:middle,
+        row_labels=row_labels,
+        fit_table_in_display_vertically=fit_table_in_display_vertically,
+        maximum_number_of_rows=max_rows,
+        show_omitted_cell_summary=show_omitted_cell_summary,
+        vertical_crop_mode=vertical_crop_mode,
         style=t_style,
     )
 
+    if omitted_rows > 0
+        print(io, "\n$(omitted_rows) rows omitted from display")
+    end
+
     if length(metadata(t)) > 0
+        print(io, omitted_rows > 0 ? "\n" : "")
         print(io, "Metadata: `$(metadata(t))`")
     end
 end
