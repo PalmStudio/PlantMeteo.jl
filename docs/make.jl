@@ -6,6 +6,7 @@ DocMeta.setdocmeta!(PlantMeteo, :DocTestSetup, :(using PlantMeteo, Dates, Statis
 
 makedocs(;
     modules=[PlantMeteo],
+    checkdocs=:exports,
     authors="remi.vezy <VEZY@users.noreply.github.com> and contributors",
     repo=Documenter.Remotes.GitHub("PalmStudio", "PlantMeteo.jl"),
     sitename="PlantMeteo.jl",
@@ -17,12 +18,16 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
-        "Getting Started" => "getting-started.md",
+        "Quickstart" => "quickstart.md",
         "Guides" => [
-            "Weather Data Sources" => "weather-apis.md",
+            "Getting Weather Data" => "getting-weather-data.md",
+            "Open-Meteo Guide" => "open-meteo.md",
+            "Core Concepts" => "core-concepts.md",
+            "Daily Aggregation" => "daily-aggregation.md",
             "Weather Sampling" => "weather-sampling.md",
+            "Read/Write Round Trip" => "read-write-round-trip.md",
         ],
-        "API" => "API.md"
+        "Reference" => "reference.md"
     ]
 )
 

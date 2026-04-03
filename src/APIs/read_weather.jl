@@ -1,51 +1,36 @@
 """
-    read_weather(
-        file[,args...];
-        date_format = DateFormat("yyyy-mm-ddTHH:MM:SS.s"),
-        date_formats = nothing,
-        hour_format = DateFormat("HH:MM:SS"),
-        duration = nothing,
-        forward_fill_date = false,
-    )
+    read_weather(file, args...; kwargs...)
 
-Read a meteo file. The meteo file is a CSV, and optionnaly with metadata in a header formatted
-as a commented YAML. The column names **and units** should match exactly the fields of
-[`Atmosphere`](https://palmstudio.github.io/PlantMeteo.jl/stable/#PlantMeteo.Atmosphere), or 
-the user should provide their transformation as arguments (`args`) with the `DataFrames.jl` form, *i.e.*: 
-- `:var_name => (x -> x .+ 1) => :new_name`: the variable `:var_name` is transformed by the function 
-    `x -> x .+ 1` and renamed to `:new_name`
-- `:var_name => :new_name`: the variable `:var_name` is renamed to `:new_name`
-- `:var_name`: the variable `:var_name` is kept as is
+Read a local weather file and convert it into a [`Weather`](@ref) table.
 
-# Note
+Use this when you already have station data, project CSV files, or archived meteorology that needs
+to be mapped into PlantMeteo's canonical variables. Input files may include a commented YAML header
+for metadata, and column transformations follow the familiar `source => transform => target` style.
 
-The variables found in the file will be used *as is* if not transformed, and not recomputed
-from the other variables. Please check that all variables have the same units as in the
-[`Atmosphere`](https://palmstudio.github.io/PlantMeteo.jl/stable/#PlantMeteo.Atmosphere) structure.
+# Transform patterns
 
-# Arguments
+- `:source => :target`: rename a column.
+- `:source => (x -> f.(x)) => :target`: transform and rename a column.
+- `:source`: keep a column as-is.
 
-- `file::String`: path to a meteo file
-- `args...`: A list of arguments to transform the table. See above to see the possible forms.
-- `date_format = DateFormat("yyyy-mm-ddTHH:MM:SS.s")`: the format for the `DateTime` columns
-- `date_formats = nothing`: optional fallback date formats tried after `date_format`
-- `hour_format = DateFormat("HH:MM:SS")`: the format for the `Time` columns (*e.g.* `hour_start`)
-- `duration`: a function to parse the `duration` column if present in the file. Usually `Dates.Day` or `Dates.Minute`.
-If the column is absent, the duration will be computed using the `hour_format` and the `hour_start` and `hour_end` columns
-along with the `date` column.
-- `forward_fill_date = false`: if `true`, missing dates are replaced by the previous parsed date.
+# Important behavior
 
-# Examples
+- file variables are used as provided unless you transform them
+- units must already match PlantMeteo's canonical units
+- if `duration` is absent, PlantMeteo can infer it from `date`, `hour_start`, and `hour_end`
+- legacy files with sparse date columns can be handled with `forward_fill_date=true`
+
+# Example
 
 ```julia
 using PlantMeteo, Dates
 
-file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
+file = joinpath(dirname(dirname(pathof(PlantMeteo))), "test", "data", "meteo.csv")
 
-meteo = read_weather(
+weather = read_weather(
     file,
     :temperature => :T,
-    :relativeHumidity => (x -> x ./100) => :Rh,
+    :relativeHumidity => (x -> x ./ 100) => :Rh,
     :wind => :Wind,
     :atmosphereCO2_ppm => :Cₐ,
     date_format = DateFormat("yyyy/mm/dd")

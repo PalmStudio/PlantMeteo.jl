@@ -17,7 +17,16 @@ vars = (
     @test keys(w) == vars
 end
 
-@testset "OpenMeteo historical data" begin
+@testset "OpenMeteo archive data" begin
+    period = [Dates.Date(2021, 12, 30), Dates.Date(2021, 12, 31)]
+    w = get_forecast(OpenMeteo(), lat, lon, period; verbose=false)
+    @test length(w) == 48 # 2 x 24 hours
+    @test typeof(w) == TimeStepTable{Atmosphere}
+    @test typeof(w.T) == Vector{Float64}
+    @test keys(w) == vars
+end
+
+@testset "OpenMeteo historical forecast data" begin
     period = [Dates.today() - Dates.Day(200), Dates.today() - Dates.Day(199)]
     w = get_forecast(OpenMeteo(), lat, lon, period; verbose=false)
     @test length(w) == 48 # 2 x 24 hours
@@ -26,8 +35,8 @@ end
     @test keys(w) == vars
 end
 
-@testset "OpenMeteo historical and forecast data" begin
-    period = [Dates.today() - Dates.Day(197), Dates.today() - Dates.Day(196)]
+@testset "OpenMeteo historical forecast and forecast data" begin
+    period = [Dates.today() - Dates.Day(1), Dates.today()]
     params = OpenMeteo()
     w = get_forecast(params, lat, lon, period; verbose=false)
     @test length(w) == 48 # 2 x 24 hours

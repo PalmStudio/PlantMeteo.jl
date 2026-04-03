@@ -4,23 +4,24 @@ CurrentModule = PlantMeteo
 
 # Weather Sampling
 
-This guide explains how to align raw weather time steps with model requirements.
+Use weather sampling when your model needs more than simple one-row-per-day aggregation. Sampling lets you define rolling or calendar windows, control reducers per variable, and cache repeated queries for long simulation loops.
 
-## Why Sampling?
+## When To Use Sampling Instead Of `to_daily`
 
-A model often needs weather at a different temporal scale than the source data.
-Examples:
+Use [`to_daily`](@ref) when you want standard daily weather summaries and one row per civil day.
 
-- source meteo is hourly, model step is 3 hours
-- source meteo is sub-hourly, model step is daily
-- a simulation needs both rolling and calendar-based aggregates
+Use sampling when:
 
-The sampling API makes these choices explicit and testable.
+- the model timestep is not just daily
+- you need a trailing window such as "the last 24 hourly steps"
+- you need calendar windows such as current day, previous week, or current month
+- different variables require different reducers
+- repeated simulation queries should be cached
 
 ## Sampling Workflow
 
 1. define the source weather table
-2. prepare a sampler object (with optional caching)
+2. prepare a sampler object
 3. choose a window specification
 4. sample one step or materialize full sampled tables
 
@@ -48,13 +49,12 @@ meteo = Weather([
     for i in 0:47
 ])
 
-meteo
+meteo[1:6]
 ```
 
 ## 2. Prepare Sampler State
 
-We can normalize transforms and enable query-level memoization with `prepare_weather_sampler`. This is optional but can speed up repeated calls with the same windows.
-This is done so that repeated identical calls can return cached objects (`lazy=true`).
+We can normalize transforms and enable query-level memoization with [`prepare_weather_sampler`](@ref). This is optional but useful when the same weather is sampled many times during a simulation.
 
 ```@example sampling
 prepared = prepare_weather_sampler(meteo)  # lazy cache enabled by default
@@ -63,21 +63,35 @@ typeof(prepared)
 
 ## 3. Rolling Window Sampling
 
-We can then aggregate over a trailing window in source-step units using `sample_weather`, which returns one aggregated `Atmosphere`.
+We can then aggregate over a trailing window in source-step units using [`sample_weather`](@ref), which returns one aggregated [`Atmosphere`](@ref).
 
 ```@example sampling
 window2 = RollingWindow(2.0)
 row3 = sample_weather(prepared, 3; window = window2)
 row3_cached = sample_weather(prepared, 3; window = window2)
-
-(row3.T, row3.Tmin, row3.Tmax, row3_cached === row3)
 ```
 
-`sample_weather` provides default transforms for common variables (*i.e.* the ones in `Atmosphere`), but you can override them with custom rules (see next section).
+```@example sampling
+row3.T
+```
+
+```@example sampling
+row3.Tmin
+```
+
+```@example sampling
+row3.Tmax
+```
+
+```@example sampling
+row3_cached === row3
+```
+
+`sample_weather` provides default transforms for common atmospheric variables, but you can override them when your model semantics differ.
 
 ## 4. Override Variable-wise Aggregation Rules
 
-We can match aggregation logic to model semantics by overriding variable-wise aggregation rules. Custom transforms are normalized and applied for this call.
+We can match aggregation logic to model semantics by overriding variable-wise aggregation rules.
 
 ```@example sampling
 custom = (
@@ -87,18 +101,43 @@ custom = (
 )
 
 row_custom = sample_weather(prepared, 3; window = window2, transforms = custom)
-(row_custom.T, row_custom.Tmax, row_custom.Tsum)
+```
+
+```@example sampling
+row_custom.T
+```
+
+```@example sampling
+row_custom.Tmax
+```
+
+```@example sampling
+row_custom.Tsum
 ```
 
 ## 5. Calendar Window Sampling
 
-Sometimes model logic is tied to civil periods (day/week/month) rather than fixed trailing windows. In this case, we can use `CalendarWindow` to aggregate all source steps that fall within the same period.
-This is useful for *e.g.* daily models that need to aggregate all hourly steps that fall within the same day, regardless of how many there are or where they fall in the source data. For example if you need the average temperature for the day, you can use a `CalendarWindow` anchored to the current period:
+Sometimes model logic is tied to civil periods (day/week/month) rather than fixed trailing windows. In that case, use [`CalendarWindow`](@ref) to aggregate all source timesteps that fall within the same period.
 
 ```@example sampling
 window_day = CalendarWindow(:day)
 day_sample = sample_weather(prepared, 5; window = window_day)
-(day_sample.T, day_sample.Tmin, day_sample.Tmax, day_sample.duration)
+```
+
+```@example sampling
+day_sample.T
+```
+
+```@example sampling
+day_sample.Tmin
+```
+
+```@example sampling
+day_sample.Tmax
+```
+
+```@example sampling
+day_sample.duration
 ```
 
 We sample the fifth hour of the series, which falls on the first day. The sampled `T` is the average of the 24 hourly steps that fall within that day, which matches our expectation for a daily aggregation:
@@ -124,7 +163,15 @@ day_sample_cached.T === day_sample.T
 The returned `Atmosphere` is different though, since the date (and sometimes duration) are different for each query step, even if the aggregated values are the same:
 
 ```@example sampling
-day_sample.date, day_sample_cached.date, day_sample2.date
+day_sample.date
+```
+
+```@example sampling
+day_sample_cached.date
+```
+
+```@example sampling
+day_sample2.date
 ```
 
 Note that `CalendarWindow` expects a `date::DateTime` column in the weather. By default, it checks for completeness of the period, but you can use `completeness = :allow_partial` to authorize incomplete periods. This is also faster since it doesn't have to perform checks.
@@ -136,8 +183,18 @@ When running long simulations, you can precompute all sampled weather tables upf
 ```@example sampling
 windows = [window2, window_day]
 tables = materialize_weather(prepared; windows = windows)
-
-(length(tables), length(tables[window2]), tables[window2][3].T ≈ row3.T)
 ```
 
-This is typically the best approach when you perform many simulations with the same weather, *e.g.* for model calibration, sensitivity analysis, or system optimization.
+```@example sampling
+length(tables)
+```
+
+```@example sampling
+length(tables[window2])
+```
+
+```@example sampling
+tables[window2][3].T ≈ row3.T
+```
+
+This is typically the best approach when you perform many simulations with the same weather, for example model calibration, sensitivity analysis, or repeated scenario runs.

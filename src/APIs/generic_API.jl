@@ -1,39 +1,76 @@
 """
     AbstractAPI
 
-An abstract type for APIs. This is used to define the API to use for the weather forecast.
-You can get all available APIs using `subtype(AbstractAPI)`.
+Abstract supertype for weather-download backends used by [`get_weather`](@ref).
+
+Implement a subtype of `AbstractAPI` plus a corresponding `get_forecast` method when you want to
+plug a custom weather provider into PlantMeteo without changing the downstream workflow.
 """
 abstract type AbstractAPI end
 
 """
-    get_weather(lat, lon, period::Union{StepRange{Date, Day}, Vector{Dates.Date}}; api::DataType=OpenMeteo, sink=TimeStepTable, kwargs...)
+    DemoAPI()
 
-Returns the weather forecast for a given location and time using a weather API.
+Offline weather backend bundled with PlantMeteo for documentation, tests, and examples.
+
+`DemoAPI` is not a real weather provider. It returns a deterministic synthetic hourly weather
+series from latitude, longitude, and date range inputs so examples can be copied into a REPL and
+run without network access. For real weather downloads, use [`OpenMeteo()`](@ref), which remains
+the default live backend for [`get_weather`](@ref).
+"""
+struct DemoAPI <: AbstractAPI end
+
+function get_forecast(::DemoAPI, lat, lon, period; verbose=true, kwargs...)
+    hours = Dates.DateTime(period[1]):Dates.Hour(1):(Dates.DateTime(period[end]) + Dates.Hour(23))
+    rows = map(hours) do t
+        h = Dates.hour(t)
+        solar = h in 6:18 ? 650.0 * sin(pi * (h - 6) / 12) : 0.0
+        day_offset = Dates.day(t) - Dates.day(period[1])
+        Atmosphere(
+            date=t,
+            duration=Dates.Hour(1),
+            T=20.0 + 5.0 * sin(2pi * h / 24) + 0.8 * day_offset,
+            Wind=1.2 + 0.1 * cos(2pi * h / 24),
+            Rh=0.65 - 0.15 * sin(2pi * h / 24),
+            P=101.3,
+            Precipitations=h in (5, 6, 17) ? 0.4 : 0.0,
+            Ri_SW_f=solar,
+            Cₐ=415.0
+        )
+    end
+    return TimeStepTable(rows, (latitude=lat, longitude=lon, source="demo-api"))
+end
+
+"""
+    get_weather(lat, lon, period; api=OpenMeteo(), sink=TimeStepTable, kwargs...)
+
+Download weather for a location and date range through a PlantMeteo API backend.
+
+This is usually the first function to use when you have coordinates and dates but no cleaned weather
+file yet. The result is a weather table that can then be inspected, aggregated with [`to_daily`](@ref),
+sampled with [`sample_weather`](@ref), or written to disk with [`write_weather`](@ref).
 
 # Arguments
 
-- `lat::Float64`: Latitude of the location in degrees
-- `lon::Float64`: Longitude of the location in degrees
-- `period::Union{StepRange{Date, Day}, Vector{Dates.Date}}`: Period of the forecast
-- `api::DataType=OpenMeteo`: API to use for the forecast.
-- `sink::DataType=TimeStepTable`: Type of the output. Default is `TimeStepTable`, but it
-can be any type that implements the `Tables.jl` interface, such as `DataFrames`.
-- `kwargs...`: Additional keyword arguments that are passed to the API
+- `lat`: latitude in degrees.
+- `lon`: longitude in degrees.
+- `period`: date range as `StepRange{Date,Day}` or `Vector{Date}`.
+- `api`: backend implementing `get_forecast`. Defaults to [`OpenMeteo()`](@ref).
+- `sink`: output sink. Defaults to [`TimeStepTable`](@ref), but any compatible sink can be used.
+- `kwargs...`: forwarded to the backend.
 
-# Details
+# Notes
 
-We can get all available APIs using `subtype(AbstractAPI)`.
-Please keep in mind that the default [`OpenMeteo`](@ref) API is not free for commercial use, and that you should
-use it responsibly.
+- The documentation site uses [`DemoAPI`](@ref), a built-in offline backend for tests and demos.
+- Real Open-Meteo calls require network access and should be treated as live external requests.
 
-# Examples
+# Example
 
 ```julia
 using PlantMeteo, Dates
-# Forecast for today and tomorrow:
-period = [today(), today()+Dates.Day(1)]
-w = get_weather(48.8566, 2.3522, period)
+
+period = Date(2025, 7, 1):Day(1):Date(2025, 7, 3)
+weather = get_weather(48.8566, 2.3522, period; api=OpenMeteo())
 ```
 """
 function get_weather(lat, lon, period::P; api::AbstractAPI=OpenMeteo(), sink=TimeStepTable, kwargs...) where {P<:Union{StepRange{Dates.Date,Dates.Day},Vector{Dates.Date}}}
