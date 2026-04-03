@@ -7,38 +7,9 @@ vars = (
     :Ri_NIR_f, :Ri_TIR_f, :Ri_custom_f
 )
 
-# Create a fake API to test without calling external APIs
-struct TestAPI <: PlantMeteo.AbstractAPI end
-
-function PlantMeteo.get_forecast(params::TestAPI, lat, lon, period; verbose=true)
-    period = Dates.DateTime(period[1]):Dates.Hour(1):Dates.DateTime(period[end])+Dates.Hour(23)
-
-    atms = Atmosphere[]
-    for i in period
-        T = 20.0 + 0.1 * Dates.value(Dates.Hour(i - period[1]))
-        Wind = T - 19.9
-        push!(atms, Atmosphere(
-            date=i,
-            duration=Hour(1),
-            T=T,
-            Wind=Wind,
-            P=101.0,
-            Rh=0.6,
-        ))
-    end
-
-    TimeStepTable(
-        atms,
-        (
-            latitude=lat,
-            longitude=lon,
-        )
-    )
-end
-
-@testset "Generic API with TestAPI" begin
+@testset "Generic API with DemoAPI" begin
     period = Dates.today():Dates.Day(1):Dates.today()+Dates.Day(1)
-    api = TestAPI()
+    api = PlantMeteo.DemoAPI()
     sink = TimeStepTable
 
     w = get_weather(lat, lon, period; api=api, sink=sink)
@@ -50,7 +21,7 @@ end
 
 @testset "Generic API sink" begin
     period = Dates.today():Dates.Day(1):Dates.today()+Dates.Day(1)
-    api = TestAPI()
+    api = PlantMeteo.DemoAPI()
     sink = DataFrame
 
     w = get_weather(lat, lon, period; api=api, sink=sink)
@@ -62,7 +33,7 @@ end
 
 @testset "to_daily" begin
     period = [Dates.today(), Dates.today() + Dates.Day(2)]
-    api = TestAPI()
+    api = PlantMeteo.DemoAPI()
     w = get_weather(lat, lon, period; api=api, sink=TimeStepTable)
     w_daily = to_daily(w)
 
@@ -77,14 +48,14 @@ end
     @test w_daily.Tmax ≈ [maximum(w.T[Dates.Date.(w.date).==i]) for i in w_dates] atol = 1.0e-6
     @test w_daily.Wind ≈ [Statistics.mean(w.Wind[Dates.Date.(w.date).==i]) for i in w_dates] atol = 1.0e-6
     @test w_daily.P ≈ [Statistics.mean(w.P[Dates.Date.(w.date).==i]) for i in w_dates] atol = 1.0e-6
-    @test w_daily.Precipitations ≈ [Statistics.mean(w.Precipitations[Dates.Date.(w.date).==i]) for i in w_dates] atol = 1.0e-6
+    @test w_daily.Precipitations ≈ [sum(w.Precipitations[Dates.Date.(w.date).==i]) for i in w_dates] atol = 1.0e-6
     @test w_daily.Rh ≈ [Statistics.mean(w.Rh[Dates.Date.(w.date).==i]) for i in w_dates] atol = 1.0e-6
 end
 
 
 @testset "to_daily (with user transformations)" begin
     period = Dates.today():Dates.Day(1):Dates.today()+Dates.Day(2)
-    api = TestAPI()
+    api = PlantMeteo.DemoAPI()
     w = get_weather(lat, lon, period; api=api, sink=TimeStepTable)
     w_daily = to_daily(
         w,

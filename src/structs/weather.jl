@@ -1,54 +1,28 @@
 """
     Weather(data[, metadata])
 
-Defines the weather, *i.e.* the local conditions of the Atmosphere for one or more time-steps.
-Each time-step is described using the [`Atmosphere`](@ref) structure, and the resulting structure
-is a `TimeStepTable`.
+Convenience constructor for a weather table made of [`Atmosphere`](@ref) rows.
 
-The simplest way to instantiate a `Weather` is to use a `DataFrame` as input.
+`Weather` returns a `TimeStepTable{Atmosphere}` and is the easiest way to say "this table is
+weather". It accepts either a vector of `Atmosphere` rows or any table whose columns match the
+canonical PlantMeteo variable names.
 
-The `DataFrame` should be formated such as each row is an observation for a given time-step
-and each column is a variable. The column names should match exactly the variables names of the
-[`Atmosphere`](@ref) structure:
+Use `Weather` when building a small synthetic weather series by hand, converting already-clean
+tabular data into PlantMeteo's table type, or returning weather from a custom API backend.
 
-## See also
-
-- the [`Atmosphere`](@ref) structure
-- the [`read_weather`](@ref) function to read Archimed-formatted meteorology data.
-
-## Examples
-
-Example of weather data defined by hand (cumbersome):
+# Example
 
 ```julia
-w = Weather(
+using PlantMeteo, Dates
+
+weather = Weather(
     [
-        Atmosphere(T = 20.0, Wind = 1.0, P = 101.3, Rh = 0.65),
-        Atmosphere(T = 23.0, Wind = 1.5, P = 101.3, Rh = 0.60),
-        Atmosphere(T = 25.0, Wind = 3.0, P = 101.3, Rh = 0.55)
+        Atmosphere(date=DateTime(2025, 7, 1, 12), duration=Hour(1), T=24.0, Wind=1.8, Rh=0.58, P=101.3),
+        Atmosphere(date=DateTime(2025, 7, 1, 13), duration=Hour(1), T=25.0, Wind=2.0, Rh=0.55, P=101.3),
     ],
-    (
-        site = "Test site",
-        important_metadata = "this is important and will be attached to our weather data"
-    )
+    (site = "demo",)
 )
 ```
-
-`Weather` is a `TimeStepTable{Atmosphere}`, so we can convert it into a `DataFrame`:
-
-```julia
-using DataFrames
-df = DataFrame(w)
-```
-
-And then back into `Weather` to make a `TimeStepTable{Atmosphere}`:
-
-```julia
-Weather(df, (site = "My site",))
-```
-
-Of course it works with any `DataFrame` that has at least the required
-variables listed in `Atmosphere`.
 """
 function Weather(data, metadata::S=NamedTuple()) where {S<:NamedTuple}
     TimeStepTable{Atmosphere}(data, metadata)

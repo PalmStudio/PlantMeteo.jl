@@ -249,15 +249,10 @@ abstract type AbstractSamplingWindow end
 """
     RollingWindow(dt=1.0)
 
-Trailing window selector for [`sample_weather`](@ref).
+Trailing sampling window for [`sample_weather`](@ref).
 
-# Arguments
-
-- `dt::Real`: trailing window length in source weather timesteps.
-
-# Notes
-
-- `RollingWindow()` is equivalent to `RollingWindow(1.0)` (identity window).
+Use `RollingWindow` when the model needs the aggregation of the last `dt` source timesteps, such as
+the previous 24 hourly records at the current simulation step.
 """
 struct RollingWindow <: AbstractSamplingWindow
     dt::Float64
@@ -267,33 +262,17 @@ RollingWindow(dt::Real) = RollingWindow(float(dt))
 RollingWindow() = RollingWindow(1.0)
 
 """
-    CalendarWindow(period; anchor=:current_period, week_start=1, completeness=:allow_partial)
+    CalendarWindow(period; anchor=:current_period, week_start=1, completeness=:strict)
 
-Calendar-based window selector used by [`sample_weather`](@ref).
+Calendar-based sampling window for [`sample_weather`](@ref).
 
-# Arguments
+Use `CalendarWindow` when sampling should follow civil periods such as day, week, or month rather
+than a fixed trailing number of source timesteps.
 
-- `period::Symbol`: grouping period.
-  - `:day`: group by civil day.
-  - `:week`: group by civil week (start controlled by `week_start`).
-  - `:month`: group by calendar month.
-- `anchor::Symbol`: which period is sampled at weather step `i`.
-  - `:current_period`: sample from the period containing `weather[i].date`.
-  - `:previous_complete_period`: sample from the period immediately before the current one.
-- `week_start::Int`: week start day in `1:7` (`1=Monday`, `7=Sunday`).
-  Used only when `period == :week`.
-- `completeness::Symbol`: behavior when selected period is missing/incomplete.
-  - `:allow_partial`: accept partial periods; if no previous period exists, fallback to `[step]`.
-  - `:strict`: require a valid complete selected period (default); otherwise throw an error.
-
-# Notes
-
-- `CalendarWindow` requires `date::DateTime` in source weather rows.
-- Completeness is checked from summed `duration` against expected civil period duration.
-
-# Errors
-
-Throws if any argument is outside the allowed set.
+- `period`: one of `:day`, `:week`, or `:month`
+- `anchor`: sample the `:current_period` or the `:previous_complete_period`
+- `week_start`: first day of week when `period == :week`
+- `completeness`: require a full period with `:strict` or accept incomplete ones with `:allow_partial`
 """
 struct CalendarWindow <: AbstractSamplingWindow
     period::Symbol
@@ -326,13 +305,10 @@ end
 """
     MeteoTransform(target; source=target, reducer=MeanWeighted())
 
-Build a transform rule consumed by [`sample_weather`](@ref).
+Variable-wise sampling rule used by [`sample_weather`](@ref).
 
-# Arguments
-
-- `target::Symbol`: output variable name in sampled weather.
-- `source::Symbol`: input variable name read from source rows.
-- `reducer`: reducer instance used on windowed values.
+`target` is the name written to the sampled row, `source` is the variable read from the source
+weather, and `reducer` defines how values over the selected window are combined.
 """
 struct MeteoTransform{R}
     target::Symbol
@@ -345,13 +321,10 @@ MeteoTransform(target::Symbol; source::Symbol=target, reducer=MeanWeighted()) = 
 """
     PreparedWeather(weather; transforms=default_sampling_transforms(), lazy=true)
 
-Build a sampler container used by [`sample_weather`](@ref).
+Internal sampler container storing source weather, normalized transforms, and optional caches.
 
-# Arguments
-
-- `weather`: source weather table (`TimeStepTable{Atmosphere}` or compatible rows).
-- `transforms`: transform specification accepted by [`normalize_sampling_transforms`](@ref).
-- `lazy::Bool`: enable memoization cache for repeated sampling queries.
+Most users should build this through [`prepare_weather_sampler`](@ref) and then pass it to
+[`sample_weather`](@ref) or [`materialize_weather`](@ref).
 """
 mutable struct PreparedWeather{W,T,C,WC}
     weather::W
@@ -375,13 +348,10 @@ end
 """
     prepare_weather_sampler(weather; transforms=default_sampling_transforms(), lazy=true)
 
-Build the [`PreparedWeather`](@ref) container holding a fine-step weather table and lazy sampling cache.
+Prepare a weather series for repeated sampling.
 
-# Arguments
-
-- `weather`: source weather table.
-- `transforms`: transform specification accepted by [`normalize_sampling_transforms`](@ref).
-- `lazy::Bool`: enable/disable sampling cache.
+Use this once before repeated calls to [`sample_weather`](@ref) when a model repeatedly queries
+rolling or calendar windows from the same fine-step weather table.
 """
 prepare_weather_sampler(weather; transforms=default_sampling_transforms(), lazy::Bool=true) =
     PreparedWeather(weather; transforms=transforms, lazy=lazy)
@@ -914,25 +884,14 @@ end
 """
     sample_weather(prepared, step; window=RollingWindow(1.0), transforms=nothing)
 
-Sample one aggregated weather row at `step` from a [`PreparedWeather`](@ref) sampler.
+Sample one aggregated weather row from prepared fine-step weather.
 
-# Arguments
+This is the main entry point for model-aligned weather sampling. It selects a window around `step`,
+reduces source variables according to the configured transforms, and returns one sampled
+[`Atmosphere`](@ref) row.
 
-- `prepared::PreparedWeather`: output of [`prepare_weather_sampler`](@ref), holding source weather and optional cache.
-- `step::Int`: 1-based index in the original fine-step weather table.
-
-# Keyword arguments
-
-- `window::AbstractSamplingWindow`: selection strategy used before reduction.
-  The default `RollingWindow(1.0)` behaves as an identity window.
-- `transforms`: optional transform override for this call.
-  If `nothing`, uses `prepared.transforms`; otherwise accepted by
-  [`normalize_sampling_transforms`](@ref) (e.g. `NamedTuple` or `Vector{MeteoTransform}`).
-
-# Returns
-
-An `Atmosphere` instance built from reduced variables over the selected window.
-When `prepared.lazy == true`, results are memoized by `(step, window, transforms)` and reused on repeated calls.
+Use it instead of [`to_daily`](@ref) when you need rolling windows, calendar windows, or custom
+reducers per variable.
 """
 function sample_weather(
     prepared::PreparedWeather,
@@ -959,14 +918,10 @@ end
 """
     materialize_weather(prepared; windows, transforms=nothing)
 
-Precompute sampled weather tables for a set of sampling windows.
-Returns `Dict{AbstractSamplingWindow,TimeStepTable{Atmosphere}}`.
+Precompute sampled weather tables for one or more sampling windows.
 
-# Arguments
-
-- `prepared::PreparedWeather`: sampler state containing source weather.
-- `windows`: iterable collection of [`AbstractSamplingWindow`](@ref).
-- `transforms`: optional transform override applied to all windows.
+Use this when the same sampled weather tables will be reused many times, for example across long
+simulation loops, calibration runs, or repeated scenarios.
 """
 function materialize_weather(prepared::PreparedWeather; windows, transforms=nothing)
     tables = Dict{AbstractSamplingWindow,TimeStepTable{Atmosphere}}()

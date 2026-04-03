@@ -168,3 +168,20 @@ end
 
     @test_throws ArgumentError ts_mut.B = [1, 2]
 end
+
+@testset "TimeStepTable limited plain-text display" begin
+    ts = TimeStepTable([(A=100 + i,) for i in 1:12])
+    io = IOContext(IOBuffer(), :limit => true, :displaysize => (12, 80))
+    show(io, MIME("text/plain"), ts)
+    output = String(take!(io.io))
+
+    @test occursin("TimeStepTable{", output)
+    @test occursin("(12 x 1):", output)
+    @test occursin("⋮", output)
+    @test occursin("8 rows omitted from display", output)
+    @test occursin("101", output)
+    @test occursin("102", output)
+    @test occursin("111", output)
+    @test occursin("112", output)
+    @test !occursin("106", output)
+end

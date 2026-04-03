@@ -1,49 +1,31 @@
 """
-    TimeStepTable(vars)
-    
-`TimeStepTable` stores variables values for each time step, *e.g.* weather variables.
-It implements the `Tables.jl` interface, so it can be used with any package that uses 
-`Tables.jl` (like `DataFrames.jl`).
+    TimeStepTable(data[, metadata])
 
-You can extend `TimeStepTable` to store your own variables by defining a new type for the 
-storage of the variables. You can look at the [`Atmosphere`](@ref) type 
-for an example implementation, or the `Status` type from 
-[`PlantSimEngine.jl`](https://github.com/VEZY/PlantSimEngine.jl).
+General timestep-indexed table type used throughout PlantMeteo.
 
-# Examples
+`TimeStepTable` stores one row per timestep and implements the `Tables.jl` interface, which makes
+it usable with downstream tabular tooling while preserving efficient row and column access inside
+PlantMeteo. [`Weather`](@ref) is simply `TimeStepTable{Atmosphere}`.
+
+Use `TimeStepTable` directly when you want PlantMeteo's table behavior without necessarily framing
+the data as weather, or when building custom timestep tables backed by your own row type.
+
+# Example
 
 ```julia
-data = TimeStepTable(
+using PlantMeteo, Dates
+
+table = TimeStepTable(
     [
-        Atmosphere(T = 20.0, Wind = 1.0, P = 101.3, Rh = 0.65),
-        Atmosphere(T = 23.0, Wind = 1.5, P = 101.3, Rh = 0.60),
-        Atmosphere(T = 25.0, Wind = 3.0, P = 101.3, Rh = 0.55)
-    ]
+        Atmosphere(date=DateTime(2025, 7, 1, 12), duration=Hour(1), T=24.0, Wind=1.8, Rh=0.58, P=101.3),
+        Atmosphere(date=DateTime(2025, 7, 1, 13), duration=Hour(1), T=25.0, Wind=2.0, Rh=0.55, P=101.3),
+    ],
+    (site = "demo",)
 )
 
-# We can convert it into a DataFrame:
-using DataFrames
-df = DataFrame(data)
-
-# We can also create a TimeStepTable from a DataFrame:
-TimeStepTable(df)
-
-# Note that by default it will use NamedTuple to store the variables
-# for high performance. If you want to use a different type, you can
-# specify it as a type parameter (if you want *e.g.* mutability or pre-computations):
-TimeStepTable{Atmosphere}(df)
-# Or if you use PlantSimEngine: TimeStepTable{Status}(df)
-
-# Indexing examples:
-data[:T]      # full column by Symbol
-data["T"]     # full column by String
-data[1]       # one row
-data[1:2]     # row subset as TimeStepTable
-data[1, :]    # one row (matrix-like syntax)
-data[1, :T]   # one cell by row + Symbol column
-data[1, "T"]  # one cell by row + String column
-data[1:2, :T] # vector slice from one column
-data[1:2, "T"]
+table[:T]
+table[1]
+table[1:2, :T]
 ```
 """
 struct TimeStepTable{T}
@@ -676,6 +658,43 @@ function Base.append!(ts::TimeStepTable, x)
     update_schema_cache_for_new_rows!(ts, x)
 end
 
+@inline function limited_display_row_count(io::IO)
+    rows, _ = displaysize(io)
+    # Leave room for title, borders, header, and optional omission/metadata lines.
+    return max(rows - 8, 1)
+end
+
+function limited_display_preview(t::TimeStepTable, io::IO)
+    total_rows = length(t)
+    shown_rows = limited_display_row_count(io)
+    if total_rows <= shown_rows
+        indices = collect(1:total_rows)
+        return indices, indices, shown_rows, 0
+    end
+
+    head_rows = max(cld(shown_rows, 2), 1)
+    tail_rows = shown_rows - head_rows
+    if (shown_rows > 1) && (tail_rows == 0)
+        head_rows -= 1
+        tail_rows = 1
+    end
+
+    gap_row = min(head_rows + 1, total_rows)
+    preview_indices = collect(1:head_rows)
+    append!(preview_indices, (gap_row, gap_row))
+    if tail_rows > 0
+        append!(preview_indices, total_rows - tail_rows + 1:total_rows)
+    end
+
+    preview_row_labels = collect(1:head_rows)
+    append!(preview_row_labels, (gap_row, gap_row))
+    if tail_rows > 0
+        append!(preview_row_labels, total_rows - tail_rows + 1:total_rows)
+    end
+
+    return preview_indices, preview_row_labels, shown_rows, total_rows - shown_rows
+end
+
 
 function show_ts(t::TimeStepTable{T}, io, io_type) where {T}
     length(t) == 0 && return
@@ -699,17 +718,52 @@ function show_ts(t::TimeStepTable{T}, io, io_type) where {T}
         t_style = PrettyTables.TextTableStyle(; table_border=Crayons.crayon"red")
     end
 
-    PrettyTables.pretty_table(
-        io, t; backend=io_type,
-        title="TimeStepTable{$(T_string)}($(length(t)) x $(length(getfield(t,:names)))):",
-        table_format=t_format,
-        row_number_column_label="Step",
-        row_labels=1:length(t),
-        vertical_crop_mode=:middle,
-        style=t_style,
-    )
+    table_to_show = t
+    row_labels = 1:length(t)
+    omitted_rows = 0
+    max_rows = -1
+    vertical_crop_mode = :bottom
+    fit_table_in_display_vertically = true
+    show_omitted_cell_summary = true
+    if io_type == :text && get(io, :limit, false)
+        preview_indices, preview_row_labels, max_rows, omitted_rows = limited_display_preview(t, io)
+        row_labels = preview_row_labels
+        table_to_show = omitted_rows == 0 ? t : t[preview_indices]
+        vertical_crop_mode = :middle
+        fit_table_in_display_vertically = false
+        show_omitted_cell_summary = false
+    end
+
+    if io_type == :text
+        PrettyTables.pretty_table(
+            io, table_to_show; backend=io_type,
+            title="TimeStepTable{$(T_string)}($(length(t)) x $(length(getfield(t,:names)))):",
+            table_format=t_format,
+            row_number_column_label="Step",
+            row_labels=row_labels,
+            fit_table_in_display_vertically=fit_table_in_display_vertically,
+            maximum_number_of_rows=max_rows,
+            show_omitted_cell_summary=show_omitted_cell_summary,
+            vertical_crop_mode=vertical_crop_mode,
+            style=t_style,
+        )
+    else
+        PrettyTables.pretty_table(
+            io, table_to_show; backend=io_type,
+            title="TimeStepTable{$(T_string)}($(length(t)) x $(length(getfield(t,:names)))):",
+            table_format=t_format,
+            row_number_column_label="Step",
+            row_labels=row_labels,
+            style=t_style,
+        )
+    end
+
+    if omitted_rows > 0
+        print(io, "\n$(omitted_rows) rows omitted from display")
+    end
 
     if length(metadata(t)) > 0
+        print(io, omitted_rows > 0 ? "\n" : "")
         print(io, "Metadata: `$(metadata(t))`")
     end
 end
