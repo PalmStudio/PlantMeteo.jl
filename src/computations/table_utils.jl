@@ -2,15 +2,12 @@
 Internal helpers for table manipulation without depending on DataFrames.
 """
 
-# Materialize any Tables.jl source as a column table (NamedTuple of columns).
-table_columns(data) = Tables.columntable(data)
-
 # Metadata is currently only guaranteed on TimeStepTable in this package.
 table_metadata(::Any) = NamedTuple()
 table_metadata(t::TimeStepTable) = getfield(t, :metadata)
 
 function set_column(data, name::Symbol, values)
-    cols = table_columns(data)
+    cols = Tables.columntable(data)
     names = collect(Symbol.(propertynames(cols)))
     vectors = Any[Tables.getcolumn(cols, n) for n in names]
     idx = findfirst(==(name), names)
@@ -26,7 +23,7 @@ function set_column(data, name::Symbol, values)
 end
 
 function rename_columns(data, renamer::Function)
-    cols = table_columns(data)
+    cols = Tables.columntable(data)
     names = collect(Symbol.(propertynames(cols)))
     vectors = Any[Tables.getcolumn(cols, n) for n in names]
     new_names = Symbol[renamer(n) for n in names]
@@ -35,7 +32,7 @@ function rename_columns(data, renamer::Function)
 end
 
 function transform_columns(data, args...)
-    cols = table_columns(data)
+    cols = Tables.columntable(data)
     names = collect(Symbol.(propertynames(cols)))
     vectors = Any[Tables.getcolumn(cols, n) for n in names]
     nrows = isempty(vectors) ? 0 : length(vectors[1])

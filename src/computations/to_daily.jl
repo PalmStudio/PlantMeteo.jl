@@ -25,7 +25,7 @@ daily = to_daily(hourly, :T => mean => :Tmean)
 """
 function to_daily(df, args...)
     Tables.istable(df) || throw(ArgumentError("`df` must implement the Tables.jl interface."))
-    cols = table_columns(df)
+    cols = Tables.columntable(df)
 
     @assert hasproperty(cols, :date) "The TimeStepTable must have a `date` column."
 
@@ -47,7 +47,7 @@ function to_daily(df, args...)
     groups, order = _group_by_day(years, dayofyear)
     transformations = (def_trans..., args...)
 
-    rows = [ _daily_row(cols, key, groups[key], transformations) for key in order ]
+    rows = [_daily_row(cols, key, groups[key], transformations) for key in order]
 
     return TimeStepTable{Atmosphere}(rows, table_metadata(df))
 end
