@@ -7,6 +7,19 @@ Use this when you already have station data, project CSV files, or archived mete
 to be mapped into PlantMeteo's canonical variables. Input files may include a commented YAML header
 for metadata, and column transformations follow the familiar `source => transform => target` style.
 
+# Arguments
+
+- `file`: path to the local weather file to read.
+- `args...`: column mapping or transformation rules applied before PlantMeteo standardizes column names.
+
+# Keyword arguments
+
+- `date_format`: primary `DateFormat` used to parse the `date` column.
+- `date_formats`: optional extra `DateFormat` or collection of formats tried after `date_format`.
+- `hour_format`: `DateFormat` used to parse `hour_start` and `hour_end` when they are stored as strings.
+- `duration`: parser for an existing `duration` column, typically a period constructor such as `Dates.Minute`.
+- `forward_fill_date`: when `true`, fills missing `date` cells with the previous non-missing date before combining with `hour_start`.
+
 # Transform patterns
 
 - `:source => :target`: rename a column.
