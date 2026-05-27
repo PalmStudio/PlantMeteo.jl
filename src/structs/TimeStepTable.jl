@@ -658,15 +658,17 @@ function Base.append!(ts::TimeStepTable, x)
     update_schema_cache_for_new_rows!(ts, x)
 end
 
+const DEFAULT_RICH_DISPLAY_ROW_COUNT = 20
+
 @inline function limited_display_row_count(io::IO)
     rows, _ = displaysize(io)
     # Leave room for title, borders, header, and optional omission/metadata lines.
     return max(rows - 8, 1)
 end
 
-function limited_display_preview(t::TimeStepTable, io::IO)
+function limited_display_preview(t::TimeStepTable, shown_rows::Integer)
     total_rows = length(t)
-    shown_rows = limited_display_row_count(io)
+    shown_rows = max(shown_rows, 1)
     if total_rows <= shown_rows
         indices = collect(1:total_rows)
         return indices, indices, shown_rows, 0
@@ -693,6 +695,17 @@ function limited_display_preview(t::TimeStepTable, io::IO)
     end
 
     return preview_indices, preview_row_labels, shown_rows, total_rows - shown_rows
+end
+
+limited_display_preview(t::TimeStepTable, io::IO) = limited_display_preview(t, limited_display_row_count(io))
+
+function should_limit_display(t::TimeStepTable, io::IO, io_type)
+    return (io_type != :text && length(t) > DEFAULT_RICH_DISPLAY_ROW_COUNT) ||
+           (io_type == :text && get(io, :limit, false))
+end
+
+function display_row_limit(io::IO, io_type)
+    return io_type == :text ? limited_display_row_count(io) : DEFAULT_RICH_DISPLAY_ROW_COUNT
 end
 
 
@@ -725,8 +738,8 @@ function show_ts(t::TimeStepTable{T}, io, io_type) where {T}
     vertical_crop_mode = :bottom
     fit_table_in_display_vertically = true
     show_omitted_cell_summary = true
-    if io_type == :text && get(io, :limit, false)
-        preview_indices, preview_row_labels, max_rows, omitted_rows = limited_display_preview(t, io)
+    if should_limit_display(t, io, io_type)
+        preview_indices, preview_row_labels, max_rows, omitted_rows = limited_display_preview(t, display_row_limit(io, io_type))
         row_labels = preview_row_labels
         table_to_show = omitted_rows == 0 ? t : t[preview_indices]
         vertical_crop_mode = :middle
@@ -754,6 +767,9 @@ function show_ts(t::TimeStepTable{T}, io, io_type) where {T}
             table_format=t_format,
             row_number_column_label="Step",
             row_labels=row_labels,
+            maximum_number_of_rows=max_rows,
+            show_omitted_cell_summary=show_omitted_cell_summary,
+            vertical_crop_mode=vertical_crop_mode,
             style=t_style,
         )
     end

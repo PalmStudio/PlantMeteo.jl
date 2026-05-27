@@ -185,3 +185,19 @@ end
     @test occursin("112", output)
     @test !occursin("106", output)
 end
+
+@testset "TimeStepTable rich display is bounded with metadata" begin
+    ts = TimeStepTable([(A=100 + i,) for i in 1:100], (file="/tmp/meteo.csv",))
+    io = IOBuffer()
+    show(io, MIME("text/html"), ts)
+    output = String(take!(io))
+
+    @test occursin("TimeStepTable{", output)
+    @test occursin("(100 x 1):", output)
+    @test occursin("80 rows omitted from display", output)
+    @test occursin("Metadata:", output)
+    @test occursin("/tmp/meteo.csv", output)
+    @test occursin("101", output)
+    @test occursin("200", output)
+    @test !occursin("150", output)
+end
