@@ -17,7 +17,9 @@ for metadata, and column transformations follow the familiar `source => transfor
 - `date_format`: primary `DateFormat` used to parse the `date` column.
 - `date_formats`: optional extra `DateFormat` or collection of formats tried after `date_format`.
 - `hour_format`: `DateFormat` used to parse `hour_start` and `hour_end` when they are stored as strings.
-- `duration`: parser for an existing `duration` column, typically a period constructor such as `Dates.Minute`.
+- `duration`: explicit duration override. A function parses an existing `duration` column or computes
+  durations from the full table when no `duration` column exists; a vector is used as-is; any other
+  value is repeated for every row.
 - `forward_fill_date`: when `true`, fills missing `date` cells with the previous non-missing date before combining with `hour_start`.
 
 # Transform patterns
@@ -30,7 +32,7 @@ for metadata, and column transformations follow the familiar `source => transfor
 
 - file variables are used as provided unless you transform them
 - units must already match PlantMeteo's canonical units
-- if `duration` is absent, PlantMeteo can infer it from `date`, `hour_start`, and `hour_end`
+- if `duration` is not provided, PlantMeteo can infer it from `date`, `hour_start`, and `hour_end`
 - legacy files with sparse date columns can be handled with `forward_fill_date=true`
 
 # Example
@@ -270,32 +272,28 @@ end
 
 Compute the `duration` column depending on several cases:
 
-- If it is already in the data, use the `duration` function to parse it into a `Date.Period`.
-- If it is not, but there's a column named `hour_end` and another one either called `hour_start`
+- If `duration` is a function and a `duration` column exists, use it to parse that column.
+- If `duration` is a function and no `duration` column exists, call it with the full table.
+- If `duration` is a vector, use it as the duration column.
+- If `duration` is any other non-`nothing` value, repeat it for every row.
+- If `duration` is not provided but a duration column is already in the data, use it as-is.
+- If `duration` is not provided, but there's a column named `hour_end` and another one either called `hour_start`
 or `date`, compute the duration from the period between `hour_start` (or `date`) and `hour_end`.
 
 # Arguments
 
 - `data`: any `Tables.jl` compatible table, such as a `DataFrame`
 - `hour_format`: a `DateFormat` to parse the `hour_start` and `hour_end` columns if they are `String`s.
-- `duration`: a function to parse the `duration` column. Usually `Dates.Day` or `Dates.Minute`.
+- `duration`: an optional explicit duration override.
 """
 function compute_duration(data, hour_format=Dates.DateFormat("HH:MM:SS"), duration=nothing)
 
-    if hasproperty(data, :duration)
-        duration === nothing && error("The `duration` column is already in the data, please provide the `duration` argument")
+    if duration !== nothing
+        return explicit_duration(data, duration)
+    end
 
-        # If the duration is a String, we try to parse it as a Period with the user-defined format:
-        # time period unit
-        duration = try
-            duration.(data.duration)
-        catch e
-            error(
-                "The values in the `duration` column cannot be parsed.",
-                " Please check the format of the durations or provide the period unit as argument (e.g. Dates.Minute).",
-                e
-            )
-        end
+    if hasproperty(data, :duration)
+        duration = data.duration
     elseif hasproperty(data, :hour_end) && !hasproperty(data, :duration)
         hour_end = parse_hour.(data.hour_end, hour_format)
 
@@ -324,6 +322,59 @@ function compute_duration(data, hour_format=Dates.DateFormat("HH:MM:SS"), durati
     end
 
     return duration
+end
+
+function explicit_duration(data, duration::Function)
+    if hasproperty(data, :duration)
+        return try
+            duration.(data.duration)
+        catch e
+            error(
+                "The values in the `duration` column cannot be parsed.",
+                " Please check the format of the durations or provide the period unit as argument (e.g. Dates.Minute).",
+                e
+            )
+        end
+    end
+
+    return normalize_explicit_duration(data, duration(data))
+end
+
+function explicit_duration(data, duration::Type{<:Dates.Period})
+    hasproperty(data, :duration) || throw(ArgumentError("`duration=$(duration)` can only parse an existing `duration` column. Provide a constant $(duration)(...) value, a vector, or a function that computes durations from the table."))
+    return try
+        duration.(data.duration)
+    catch e
+        error(
+            "The values in the `duration` column cannot be parsed.",
+            " Please check the format of the durations or provide the period unit as argument (e.g. Dates.Minute).",
+            e
+        )
+    end
+end
+
+function explicit_duration(data, duration::AbstractVector)
+    return normalize_explicit_duration(data, duration)
+end
+
+function explicit_duration(data, duration)
+    return fill(duration, table_row_count(data))
+end
+
+function table_row_count(data)
+    columns = propertynames(data)
+    isempty(columns) && return 0
+    return length(getproperty(data, first(columns)))
+end
+
+function normalize_explicit_duration(data, duration::AbstractVector)
+    expected = table_row_count(data)
+    length(duration) == expected || throw(ArgumentError("The `duration` vector must have one value per row. Expected $expected values, got $(length(duration))."))
+    return duration
+end
+
+function normalize_explicit_duration(data, duration)
+    return fill(duration, table_row_count(data))
 end
 
 """
