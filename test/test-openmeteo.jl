@@ -58,12 +58,18 @@ function capture_error(f)
     end
 end
 
+@static if hasfield(PlantMeteo.HTTP.TimeoutError, :readtimeout)
+    openmeteo_timeout_error() = PlantMeteo.HTTP.TimeoutError(Int64(1))
+else
+    openmeteo_timeout_error() = PlantMeteo.HTTP.TimeoutError("request", Int64(1))
+end
+
 @testset "OpenMeteo retries transient failures" begin
     attempts = Ref(0)
     sleep_calls = Float64[]
     request_get(url; status_exception=false) = begin
         attempts[] += 1
-        attempts[] < 3 && throw(PlantMeteo.HTTP.TimeoutError(1))
+        attempts[] < 3 && throw(openmeteo_timeout_error())
         PlantMeteo.HTTP.Response(200, PlantMeteo.JSON.json(openmeteo_payload()))
     end
 
@@ -85,6 +91,12 @@ end
     @test sleep_calls == [0.25, 0.5]
     @test length(weather) == 2
     @test metadata.timezone == "UTC"
+end
+
+@testset "OpenMeteo formats connection failures" begin
+    err = PlantMeteo.HTTP.ConnectError("example.test:443", ErrorException("connection refused"))
+    @test PlantMeteo.is_transient_openmeteo_error(err)
+    @test occursin("connection refused", PlantMeteo.openmeteo_error_reason(err))
 end
 
 @testset "OpenMeteo retries retryable HTTP status codes" begin
