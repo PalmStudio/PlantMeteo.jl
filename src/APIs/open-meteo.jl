@@ -452,6 +452,10 @@ is_transient_openmeteo_error(::HTTP.ConnectError) = true
 is_transient_openmeteo_error(err::HTTP.StatusError) = err.status in OPENMETEO_RETRYABLE_STATUS_CODES
 is_transient_openmeteo_error(err) = err isa EOFError || err isa Base.IOError
 
+@static if isdefined(HTTP, :TLSHandshakeError)
+    is_transient_openmeteo_error(::HTTP.TLSHandshakeError) = true
+end
+
 openmeteo_error_reason(err::HTTP.TimeoutError) = "request timed out"
 function openmeteo_error_reason(err::HTTP.ConnectError)
     cause = hasproperty(err, :error) ? err.error : err.cause

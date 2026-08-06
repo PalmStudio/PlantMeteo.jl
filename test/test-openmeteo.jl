@@ -99,6 +99,13 @@ end
     @test occursin("connection refused", PlantMeteo.openmeteo_error_reason(err))
 end
 
+@static if isdefined(PlantMeteo.HTTP, :TLSHandshakeError)
+    @testset "OpenMeteo classifies TLS handshake failures as transient" begin
+        err = PlantMeteo.HTTP.TLSHandshakeError(ErrorException("i/o timeout"))
+        @test PlantMeteo.is_transient_openmeteo_error(err)
+    end
+end
+
 @testset "OpenMeteo retries retryable HTTP status codes" begin
     attempts = Ref(0)
     sleep_calls = Float64[]
