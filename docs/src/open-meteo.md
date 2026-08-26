@@ -51,6 +51,17 @@ Open-Meteo is useful, but it should be presented honestly:
 
 PlantMeteo uses Open-Meteo because it is practical, not because it is universally better than local observations.
 
+The backend uses the units requested through [`OpenMeteoUnits`](@ref) as the
+explicit import contract. It converts Fahrenheit to °C, km/h, mph, or knots to
+m/s, inches to mm, percent humidity to a fraction, and hPa pressure to kPa. It
+never guesses units from values. Returned weather metadata keeps both
+`source_units` and canonical `units`, and records applied conversions in the
+YAML-safe `import_normalization` history. Every consumed payload label is
+validated, including ISO-8601 time and the three radiation fields in W/m².
+Missing or invalid core forcing is reported as an error; it is not replaced
+with an epsilon or a default pressure. Affine provenance uses
+`output = input * scale + offset`.
+
 ## When To Trust It And When To Validate It
 
 Open-Meteo is often a good fit when:

@@ -262,7 +262,8 @@ end
 Fetches the weather forecast from OpenMeteo.com and returns a tuple of: 
 
 - a vector of [`Atmosphere`](@ref)
-- a `NamedTuple` of metadata (e.g. `elevation`, `timezone`, `units`...)
+- a `NamedTuple` of metadata (e.g. `elevation`, `timezone`, canonical `units`,
+  `source_units`, and the deterministic `import_normalization` history)
 
 """
 function fetch_openmeteo(
@@ -317,15 +318,19 @@ function fetch_openmeteo(
         attempts
     )
 
+    formatted = format_openmeteo(data, params.units)
+
     return (
-        format_openmeteo!(data),
+        formatted.atmospheres,
         (
             latitude=data["latitude"],
             longitude=data["longitude"],
             elevation=data["elevation"],
             timezone=data["timezone"],
-            units=data["hourly_units"],
+            units=formatted.units,
+            source_units=Dict{String,Any}(data["hourly_units"]),
             timezone_abbreviation=data["timezone_abbreviation"],
+            import_normalization=formatted.import_normalization,
         )
     )
 end
@@ -470,44 +475,54 @@ openmeteo_error_reason(err) = sprint(showerror, err)
 end
 
 """
-    format_openmeteo(data)
+    format_openmeteo(data, units=OpenMeteoUnits(); constant=Constants())
 
-Format the JSON file returned by the Open-Meteo API into a vector 
-of [`Atmosphere`](@ref). The function also updates some units in `data`.
+Format an Open-Meteo JSON payload into canonical [`Atmosphere`](@ref) rows.
+
+The request's explicit `OpenMeteoUnits` configuration drives all conversions;
+values are never used to guess units. The source payload is left unchanged.
+The return value contains `atmospheres`, canonical `units`, and a YAML-safe
+`import_normalization` history.
 """
-function format_openmeteo!(data; constant=Constants(), verbose=true)
+function format_openmeteo(data, units::OpenMeteoUnits=OpenMeteoUnits(); constant=Constants())
     atms = Atmosphere[]
+    unit_specs = _openmeteo_unit_specs(units)
+    _validate_openmeteo_normalization_units(data["hourly_units"], unit_specs)
     datetime = [Dates.DateTime(i, Dates.dateformat"yyyy-mm-ddTHH:MM") for i in data["hourly"]["time"]]
 
     # Duration in sensible units (e.g. 1 hour, or 1 day)
     duration = timesteps_durations(datetime)
 
+    raw_units = (
+        T=[
+            check_and_parse(value, "Temperature", datetime[i])
+            for (i, value) in enumerate(data["hourly"]["temperature_2m"])
+        ],
+        Wind=[
+            check_and_parse(value, "Wind speed", datetime[i])
+            for (i, value) in enumerate(data["hourly"]["windspeed_10m"])
+        ],
+        Precipitations=[
+            check_and_parse(value, "Precipitation", datetime[i])
+            for (i, value) in enumerate(data["hourly"]["precipitation"])
+        ],
+        Rh=[
+            check_and_parse(value, "Relative humidity", datetime[i])
+            for (i, value) in enumerate(data["hourly"]["relativehumidity_2m"])
+        ],
+        P=[
+            check_and_parse(value, "Surface pressure", datetime[i])
+            for (i, value) in enumerate(data["hourly"]["surface_pressure"])
+        ],
+    )
+    normalized = _normalize_openmeteo_import(raw_units, unit_specs)
+
     for i in 1:length(data["hourly"]["time"])
-        P = data["hourly"]["surface_pressure"][i]
-
-        if P === nothing
-            verbose && @warn string(
-                "Surface pressure data is `nothing` on $(datetime[i]).",
-                "Using default value $(DEFAULTS.P)."
-            ) maxlog = 10
-            P = DEFAULTS.P
-        else
-            P = Float64(P) / 10.0
-        end
-
-        # To avoid warnings in atmosphere:
-        if data["hourly"]["windspeed_10m"][i] === nothing
-            Wind = 1.0e-6
-        else
-            Wind = Float64(data["hourly"]["windspeed_10m"][i])
-            if Wind <= 0.0
-                Wind = 1.0e-6
-            end
-        end
-
-        T = check_and_parse(data["hourly"]["temperature_2m"][i], "Temperature", datetime[i])
-        Rh = check_and_parse(data["hourly"]["relativehumidity_2m"][i], "Relative humidity", datetime[i]) / 100.0
-        Precip = check_and_parse(data["hourly"]["precipitation"][i], "Precipitation", datetime[i])
+        P = normalized.data.P[i]
+        Wind = normalized.data.Wind[i]
+        T = normalized.data.T[i]
+        Rh = normalized.data.Rh[i]
+        Precip = normalized.data.Precipitations[i]
         Ri_SW_f = check_and_parse(data["hourly"]["shortwave_radiation"][i], "Shortwave radiation", datetime[i])
         Ri_SW_f_direct = check_and_parse(data["hourly"]["direct_radiation"][i], "Direct radiation", datetime[i])
         Ri_SW_f_diffuse = check_and_parse(data["hourly"]["diffuse_radiation"][i], "Diffuse radiation", datetime[i])
@@ -540,10 +555,138 @@ function format_openmeteo!(data; constant=Constants(), verbose=true)
         )
     end
 
-    data["hourly_units"]["relativehumidity_2m"] = "0-1"
-    data["hourly_units"]["surface_pressure"] = "kPa"
+    return (
+        atmospheres=atms,
+        units=_canonical_openmeteo_units(data["hourly_units"]),
+        import_normalization=_weather_import_provenance_history(normalized.provenance),
+    )
+end
 
-    return atms
+function _openmeteo_unit_specs(units::OpenMeteoUnits)
+    temperature = if units.temperature_unit == "celsius"
+        (input_unit=:celsius, output_unit=:celsius, payload_unit="°C", scale=1.0, offset=0.0)
+    else
+        (input_unit=:fahrenheit, output_unit=:celsius, payload_unit="°F", scale=5.0 / 9.0, offset=-32.0 * 5.0 / 9.0)
+    end
+
+    wind = if units.windspeed_unit == "ms"
+        (input_unit=:ms, output_unit=:ms, payload_unit="m/s", scale=1.0, offset=0.0)
+    elseif units.windspeed_unit == "kmh"
+        (input_unit=:kmh, output_unit=:ms, payload_unit="km/h", scale=1.0 / 3.6, offset=0.0)
+    elseif units.windspeed_unit == "mph"
+        (input_unit=:mph, output_unit=:ms, payload_unit="mp/h", scale=0.44704, offset=0.0)
+    else
+        (input_unit=:kn, output_unit=:ms, payload_unit="kn", scale=1852.0 / 3600.0, offset=0.0)
+    end
+
+    precipitation = if units.precipitation_unit == "mm"
+        (input_unit=:mm, output_unit=:mm, payload_unit="mm", scale=1.0, offset=0.0)
+    else
+        (input_unit=:inch, output_unit=:mm, payload_unit="inch", scale=25.4, offset=0.0)
+    end
+
+    return (
+        T=temperature,
+        Wind=wind,
+        Precipitations=precipitation,
+        Rh=(input_unit=:percent, output_unit=:fraction, payload_unit="%", scale=0.01, offset=0.0),
+        P=(input_unit=:hPa, output_unit=:kPa, payload_unit="hPa", scale=0.1, offset=0.0),
+    )
+end
+
+function _normalize_openmeteo_import(data, unit_specs)
+    normalized = data
+    conversions = NamedTuple[]
+    for variable in (:T, :Wind, :Precipitations)
+        spec = getproperty(unit_specs, variable)
+        normalized, conversion = _normalize_openmeteo_import_column(
+            normalized,
+            variable,
+            spec,
+        )
+        conversion === nothing || push!(conversions, conversion)
+    end
+
+    core = normalize_weather_import(
+        normalized;
+        input_units=(Rh=unit_specs.Rh.input_unit, P=unit_specs.P.input_unit),
+    )
+    append!(conversions, core.provenance.conversions)
+
+    provenance = (
+        input_units=(
+            T=unit_specs.T.input_unit,
+            Wind=unit_specs.Wind.input_unit,
+            Precipitations=unit_specs.Precipitations.input_unit,
+            Rh=core.provenance.input_units.Rh,
+            P=core.provenance.input_units.P,
+        ),
+        output_units=(
+            T=unit_specs.T.output_unit,
+            Wind=unit_specs.Wind.output_unit,
+            Precipitations=unit_specs.Precipitations.output_unit,
+            Rh=core.provenance.output_units.Rh,
+            P=core.provenance.output_units.P,
+        ),
+        conversions=Tuple(conversions),
+    )
+    return (data=core.data, provenance=provenance)
+end
+
+function _normalize_openmeteo_import_column(data, variable, spec)
+    iszero(spec.offset) && return _normalize_weather_import_column(
+        data,
+        variable,
+        spec.input_unit,
+        spec.output_unit,
+        spec.scale,
+    )
+
+    hasproperty(data, variable) || return data, nothing
+    values_ = map(Tables.getcolumn(data, variable)) do value
+        ismissing(value) ? missing : value * spec.scale + spec.offset
+    end
+    normalized = set_column(data, variable, values_)
+    conversion = (
+        variable=variable,
+        input_unit=spec.input_unit,
+        output_unit=spec.output_unit,
+        scale=spec.scale,
+        offset=spec.offset,
+    )
+    return normalized, conversion
+end
+
+function _validate_openmeteo_normalization_units(units, unit_specs)
+    expected = (
+        time="iso8601",
+        temperature_2m=unit_specs.T.payload_unit,
+        windspeed_10m=unit_specs.Wind.payload_unit,
+        precipitation=unit_specs.Precipitations.payload_unit,
+        relativehumidity_2m=unit_specs.Rh.payload_unit,
+        surface_pressure=unit_specs.P.payload_unit,
+        shortwave_radiation="W/m²",
+        direct_radiation="W/m²",
+        diffuse_radiation="W/m²",
+    )
+    for (variable, expected_unit) in pairs(expected)
+        key = string(variable)
+        actual = get(units, key, nothing)
+        actual == expected_unit || throw(ArgumentError(
+            "Open-Meteo unit for `$key` must be `$expected_unit` before normalization, got $(repr(actual))",
+        ))
+    end
+    return nothing
+end
+
+function _canonical_openmeteo_units(source_units)
+    units = Dict{String,Any}(source_units)
+    units["temperature_2m"] = "°C"
+    units["windspeed_10m"] = "m/s"
+    units["precipitation"] = "mm"
+    units["relativehumidity_2m"] = "0-1"
+    units["surface_pressure"] = "kPa"
+    return units
 end
 
 function check_and_parse(x, type, date)
