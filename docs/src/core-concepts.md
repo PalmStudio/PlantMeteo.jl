@@ -31,6 +31,17 @@ row
 
 An `Atmosphere` row stores one weather timestep. Some variables are mandatory (`T`, `Wind`, `Rh`), while others are optional or can be computed from those core inputs.
 
+Construction is strict by default. Invalid wind, humidity, or pressure throws an
+error before dependent variables are computed. `check=false` skips these checks
+but does not clamp wind, divide humidity by 100, convert pressure, or otherwise
+change the supplied values. Physical zero remains valid for calm wind, dry air,
+darkness, and zero incoming radiation.
+
+Optional `clearness` and `Ri_*_f` forcing is structural. If a keyword is
+omitted, the property is absent; if the source explicitly contains a missing
+value, pass `missing` and the property remains present. PlantMeteo does not use
+`Inf` to mean "not supplied".
+
 ## `Weather`: A Convenient Weather Constructor
 
 ```@example concepts
@@ -54,6 +65,9 @@ weather
 ```
 
 `Weather` is usually the easiest way to say "this is a weather table made of atmospheric rows".
+If an optional forcing exists on only some input rows, `Weather` keeps one
+stable union schema and inserts `missing` in the other rows. A forcing omitted
+from every row remains structurally absent from the whole table.
 
 ## `TimeStepTable`: The Shared Table Abstraction
 
@@ -103,6 +117,10 @@ PlantMeteo expects canonical variable names and units in `Atmosphere` rows. For 
 - `Ri_SW_f`: incoming short-wave radiation flux in W m-2
 
 This is why [`read_weather`](@ref) matters: local files rarely arrive with these exact names and units.
+Declare non-canonical humidity and pressure units with `input_units`, or call
+[`normalize_weather_import`](@ref) directly. Conversion is never guessed from
+the magnitude of a value. Imported tables append a YAML-safe provenance record
+that lists the conversions applied without discarding earlier import history.
 
 ## What Comes Next
 

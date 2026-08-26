@@ -19,6 +19,7 @@ include("computations/duration.jl")
 include("structs/weather.jl")
 include("variables.jl")
 include("APIs/generic_API.jl")
+include("APIs/normalize_weather_import.jl")
 include("APIs/read_weather.jl")
 include("APIs/open-meteo.jl")
 include("computations/conversions.jl")
@@ -36,7 +37,7 @@ export e_sat, air_density, latent_heat_vaporization
 export psychrometer_constant
 export rh_from_vpd, rh_from_e, vpd, vpd_from_e
 export metadata, metadatakeys
-export read_weather, write_weather
+export normalize_weather_import, read_weather, write_weather
 export duration_seconds, positive_duration_seconds
 export row_datetime_interval, check_non_overlapping_timesteps, select_overlapping_timesteps
 export get_forecast

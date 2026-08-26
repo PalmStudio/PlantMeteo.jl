@@ -101,6 +101,61 @@ end
     @test eltype(df_mixed.A) == Union{Nothing,Float64}
 end
 
+@testset "Atmosphere optional forcing has one table schema" begin
+    without_radiation = Atmosphere(T=20.0, Wind=1.0, P=101.3, Rh=0.65)
+    with_radiation = Atmosphere(
+        T=21.0,
+        Wind=1.5,
+        P=101.3,
+        Rh=0.60,
+        Ri_SW_f=250.0,
+    )
+
+    late_optional = TimeStepTable([without_radiation, with_radiation])
+    @test :Ri_SW_f in keys(late_optional)
+    @test ismissing(late_optional[1].Ri_SW_f)
+    @test late_optional[2].Ri_SW_f == 250.0
+    radiation_index = findfirst(==(:Ri_SW_f), keys(late_optional))
+    @test Tables.schema(late_optional).types[radiation_index] == Union{Missing,Float64}
+
+    early_optional = TimeStepTable([with_radiation, without_radiation])
+    @test keys(early_optional) == keys(late_optional)
+    @test early_optional[1].Ri_SW_f == 250.0
+    @test ismissing(early_optional[2].Ri_SW_f)
+
+    erased_container = TimeStepTable(Any[without_radiation, with_radiation])
+    @test keys(erased_container) == keys(late_optional)
+    @test ismissing(erased_container[1].Ri_SW_f)
+    @test erased_container[2].Ri_SW_f == 250.0
+
+    @test_throws ArgumentError TimeStepTable([(A=1,), (A=2, B=3)])
+    @test_throws ArgumentError TimeStepTable([
+        Dict{Symbol,Int}(:A => 1),
+        Dict{Symbol,Int}(:A => 2, :B => 3),
+    ])
+
+    uniform = TimeStepTable([without_radiation])
+    @test_throws ArgumentError push!(uniform, with_radiation)
+    @test_throws ArgumentError append!(uniform, [with_radiation])
+
+    incompatible = Atmosphere(;
+        T="20", Wind="1", P="101.3", Rh="0.5",
+        Precipitations="0", Cₐ="400", e="1", eₛ="2", VPD="1",
+        ρ="1", λ="1", γ="1", ε="1", Δ="1",
+        check=false,
+    )
+    original_length = length(uniform)
+    @test_throws ArgumentError push!(uniform, incompatible)
+    @test length(uniform) == original_length
+    @test_throws ArgumentError append!(uniform, (row for row in (without_radiation, incompatible)))
+    @test length(uniform) == original_length
+
+    stateful = Iterators.Stateful((without_radiation,))
+    append!(uniform, stateful)
+    @test length(uniform) == original_length + 1
+    @test isempty(collect(stateful))
+end
+
 @testset "TimeStepTable schema cache invalidation" begin
     ts_dict = TimeStepTable([Dict{Symbol,Any}(:A => 1), Dict{Symbol,Any}(:A => 2)])
     sch1 = Tables.schema(ts_dict)

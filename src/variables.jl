@@ -55,10 +55,11 @@ file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
 df = read_weather(
     file,
     :temperature => :T,
-    :relativeHumidity => (x -> x ./100) => :Rh,
+    :relativeHumidity => :Rh,
     :wind => :Wind,
     :atmosphereCO2_ppm => :Cₐ,
-    date_format = DateFormat("yyyy/mm/dd")
+    date_format = DateFormat("yyyy/mm/dd"),
+    input_units = (Rh=:percent,)
 ) |> DataFrame
 
 df = standardize_columns!(ToFileColumns(), df)

@@ -3,8 +3,7 @@ lon = 2.3522
 
 vars = (
     :date, :duration, :T, :Wind, :P, :Rh, :Precipitations, :Cₐ, :e,
-    :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ, :clearness, :Ri_SW_f, :Ri_PAR_f,
-    :Ri_NIR_f, :Ri_TIR_f, :Ri_custom_f
+    :eₛ, :VPD, :ρ, :λ, :γ, :ε, :Δ, :Ri_SW_f
 )
 
 @testset "Generic API with DemoAPI" begin

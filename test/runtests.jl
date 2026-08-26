@@ -9,6 +9,10 @@ using Documenter # for doctests
         include("test-atmosphere.jl")
     end
 
+    @testset "weather import normalization" begin
+        include("test-normalize-weather-import.jl")
+    end
+
     @testset "weather()" begin
         include("test-weather.jl")
     end

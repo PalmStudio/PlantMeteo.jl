@@ -28,6 +28,19 @@ with `T`, `Wind`, and `Rh`; other fields are optional or can be derived from tho
 Additional atmospheric variables such as `e`, `VPD`, `ρ`, `λ`, `γ`, `ε`, and `Δ` can be supplied
 explicitly or left to their default computations.
 
+With the default `check=true`, core values are validated before derived values
+are computed: `Wind` must be non-negative, `Rh` must be in `[0, 1]`, and `P` must
+be in the terrestrial `]85, 110[` kPa range. Invalid values throw an error;
+the constructor never clamps wind, guesses percent humidity, or converts
+pressure. Use [`normalize_weather_import`](@ref) explicitly at an import
+boundary when source units differ.
+
+`clearness` and `Ri_*_f` fields are present only when supplied. Pass `missing`
+when the source explicitly contains a missing value. Omitting one of these
+keywords means that the forcing is structurally absent; `Inf` is not used as an
+absence marker. Physical zeros are valid for calm wind, dry air, darkness, and
+zero incoming radiation.
+
 # Example
 
 ```julia
@@ -48,6 +61,9 @@ struct Atmosphere{N,T<:Tuple} <: AbstractAtmosphere
     nt::NamedTuple{N,T}
 end
 
+struct _UnsetAtmosphereValue end
+const _UNSET_ATMOSPHERE_VALUE = _UnsetAtmosphereValue()
+
 function Atmosphere(;
     T=nothing, Wind=nothing, Rh=nothing, kwargs...
 )
@@ -67,10 +83,16 @@ end
 function _build_atmosphere(;
     T, Wind, Rh, date::D1=Dates.now(), duration=Dates.Second(1.0), P=DEFAULTS.P,
     Precipitations=DEFAULTS.Precipitations, Cₐ=DEFAULTS.Cₐ, check=true,
-    e=vapor_pressure(T, Rh, check=check), eₛ=e_sat(T), VPD=eₛ - e, ρ=air_density(T, P, check=check),
-    λ=latent_heat_vaporization(T), γ=psychrometer_constant(P, λ, check=check),
-    ε=atmosphere_emissivity(T, e), Δ=e_sat_slope(T), clearness=Inf,
-    Ri_SW_f=Inf, Ri_PAR_f=Inf, Ri_NIR_f=Inf, Ri_TIR_f=Inf, Ri_custom_f=Inf,
+    e=_UNSET_ATMOSPHERE_VALUE, eₛ=_UNSET_ATMOSPHERE_VALUE,
+    VPD=_UNSET_ATMOSPHERE_VALUE, ρ=_UNSET_ATMOSPHERE_VALUE,
+    λ=_UNSET_ATMOSPHERE_VALUE, γ=_UNSET_ATMOSPHERE_VALUE,
+    ε=_UNSET_ATMOSPHERE_VALUE, Δ=_UNSET_ATMOSPHERE_VALUE,
+    clearness=_UNSET_ATMOSPHERE_VALUE,
+    Ri_SW_f=_UNSET_ATMOSPHERE_VALUE,
+    Ri_PAR_f=_UNSET_ATMOSPHERE_VALUE,
+    Ri_NIR_f=_UNSET_ATMOSPHERE_VALUE,
+    Ri_TIR_f=_UNSET_ATMOSPHERE_VALUE,
+    Ri_custom_f=_UNSET_ATMOSPHERE_VALUE,
     args...
 ) where {D1<:Dates.AbstractTime}
 
@@ -80,33 +102,24 @@ function _build_atmosphere(;
         end
     end
 
-    # Checking some values:
-    if Wind <= 0.0
-        @warn "Wind ($Wind) should always be > 0, forcing it to 1e-6" maxlog = 1
-        Wind = 1.0e-6
-    end
-
-    if Rh <= 0.0
-        @warn "Rh ($Rh) should always be > 0, forcing it to 1e-6" maxlog = 1
-        Rh = 1.0e-6
-    end
-
-    if Rh > 1.0
-        if 1.0 < Rh < 100.0
-            @warn "Rh ($Rh) should be 0 < Rh < 1, assuming it is given in % and dividing by 100" maxlog = 1
-            Rh /= 100.0
-        else
-            @error "Rh ($Rh) should be 0 < Rh < 1"
+    if check
+        _validate_atmosphere_core(T, Wind, Rh, P)
+        _validate_optional_atmosphere_forcing(:clearness, clearness)
+        for (name, value) in pairs((; Ri_SW_f, Ri_PAR_f, Ri_NIR_f, Ri_TIR_f, Ri_custom_f))
+            _validate_optional_atmosphere_forcing(name, value)
         end
     end
 
-    if !ismissing(P) && P <= 85.0 || P >= 110.0 # ~ max and min pressure on Earth
-        @warn "P ($P) should be in kPa (i.e. 101.325 kPa at sea level), please consider converting it" maxlog = 1
-    end
-
-    if !ismissing(clearness) && clearness != Inf && (clearness <= 0.0 || clearness > 1.0)
-        @error "clearness ($clearness) should always be 0 < clearness < 1"
-    end
+    # Core values are validated before any derived value is computed. `check=false`
+    # deliberately skips validation only; it never changes the values supplied by the caller.
+    e = e === _UNSET_ATMOSPHERE_VALUE ? vapor_pressure(T, Rh; check=false) : e
+    eₛ = eₛ === _UNSET_ATMOSPHERE_VALUE ? e_sat(T) : eₛ
+    VPD = VPD === _UNSET_ATMOSPHERE_VALUE ? eₛ - e : VPD
+    ρ = ρ === _UNSET_ATMOSPHERE_VALUE ? air_density(T, P; check=false) : ρ
+    λ = λ === _UNSET_ATMOSPHERE_VALUE ? latent_heat_vaporization(T) : λ
+    γ = γ === _UNSET_ATMOSPHERE_VALUE ? psychrometer_constant(P, λ; check=false) : γ
+    ε = ε === _UNSET_ATMOSPHERE_VALUE ? atmosphere_emissivity(T, e) : ε
+    Δ = Δ === _UNSET_ATMOSPHERE_VALUE ? e_sat_slope(T) : Δ
 
     params_same_type =
         (;
@@ -123,23 +136,79 @@ function _build_atmosphere(;
             λ=λ,
             γ=γ,
             ε=ε,
-            Δ=Δ,
-            clearness=clearness,
-            Ri_SW_f=Ri_SW_f,
-            Ri_PAR_f=Ri_PAR_f,
-            Ri_NIR_f=Ri_NIR_f,
-            Ri_TIR_f=Ri_TIR_f,
-            Ri_custom_f=Ri_custom_f
+            Δ=Δ
         )
+
+    promoted_params = (; zip(keys(params_same_type), promote(values(params_same_type)...))...)
+    optional_params = _atmosphere_optional_forcing(
+        typeof(promoted_params.T);
+        clearness,
+        Ri_SW_f,
+        Ri_PAR_f,
+        Ri_NIR_f,
+        Ri_TIR_f,
+        Ri_custom_f,
+    )
 
     Atmosphere(
         (;
         date=date,
         duration=duration,
         # We promote the types that we know should share the same type:
-        zip(keys(params_same_type), promote(values(params_same_type)...))...,
+        promoted_params...,
+        optional_params...,
         args...)
     )
+end
+
+function _validate_finite_real(name::Symbol, value)
+    value isa Real || throw(ArgumentError("$name must be a real value, got $(repr(value))"))
+    isfinite(value) || throw(ArgumentError("$name must be finite, got $value"))
+    return nothing
+end
+
+function _validate_atmosphere_core(T, Wind, Rh, P)
+    for (name, value) in pairs((; T, Wind, Rh, P))
+        _validate_finite_real(name, value)
+    end
+
+    Wind >= 0.0 || throw(ArgumentError("Wind speed ($Wind) must be non-negative"))
+    0.0 <= Rh <= 1.0 || throw(ArgumentError("Relative humidity ($Rh) must be between 0 and 1"))
+    85.0 < P < 110.0 || throw(ArgumentError("Air pressure ($P) is not in the 85-110 kPa earth range"))
+    return nothing
+end
+
+function _validate_optional_atmosphere_forcing(name::Symbol, value)
+    value === _UNSET_ATMOSPHERE_VALUE && return nothing
+    ismissing(value) && return nothing
+    _validate_finite_real(name, value)
+
+    if name === :clearness
+        0.0 <= value <= 1.0 || throw(ArgumentError("clearness ($value) must be between 0 and 1"))
+    else
+        value >= 0.0 || throw(ArgumentError("$name ($value) must be non-negative"))
+    end
+    return nothing
+end
+
+function _atmosphere_optional_forcing(
+    numeric_type::Type;
+    clearness,
+    Ri_SW_f,
+    Ri_PAR_f,
+    Ri_NIR_f,
+    Ri_TIR_f,
+    Ri_custom_f,
+)
+    names = Symbol[]
+    values_ = Any[]
+    for (name, value) in pairs((; clearness, Ri_SW_f, Ri_PAR_f, Ri_NIR_f, Ri_TIR_f, Ri_custom_f))
+        value === _UNSET_ATMOSPHERE_VALUE && continue
+        value === nothing && throw(ArgumentError("$name cannot be `nothing`; omit it when absent or use `missing` for an explicit missing value"))
+        push!(names, name)
+        push!(values_, ismissing(value) ? missing : convert(numeric_type, value))
+    end
+    return NamedTuple{Tuple(names)}(Tuple(values_))
 end
 
 Base.keys(::Atmosphere{names}) where {names} = names

@@ -84,12 +84,19 @@ file = joinpath(dirname(dirname(pathof(PlantMeteo))), "test", "data", "meteo.csv
 file_weather = read_weather(
     file,
     :temperature => :T,
-    :relativeHumidity => (x -> x ./ 100) => :Rh,
+    :relativeHumidity => :Rh,
     :wind => :Wind,
     :atmosphereCO2_ppm => :Cₐ,
-    date_format = DateFormat("yyyy/mm/dd")
+    date_format = DateFormat("yyyy/mm/dd"),
+    input_units = (Rh=:percent,)
 )
 ```
+
+Unit conversion is explicit. `input_units` is applied only after source columns
+have been renamed to PlantMeteo names. The table metadata records the declared
+input units and the conversions that were actually applied. Re-reading an
+export appends a record to `import_normalization`; it does not replace the
+earlier import history.
 
 ```@example getting_data
 length(file_weather)
@@ -117,10 +124,11 @@ date;hour_start;hour_end;temperature;relativeHumidity;wind;clearness
     read_weather(
         path,
         :temperature => :T,
-        :relativeHumidity => (x -> x ./ 100) => :Rh,
+        :relativeHumidity => :Rh,
         :wind => :Wind,
         date_formats = (DateFormat("yyyy/mm/dd"), DateFormat("yyyy-mm-dd")),
         forward_fill_date = true,
+        input_units = (Rh=:percent,),
     )
 end
 ```

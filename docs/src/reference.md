@@ -17,6 +17,7 @@ get_index_raw
 ## Data Ingestion And Export
 
 ```@docs
+normalize_weather_import
 read_weather
 write_weather
 row_datetime_interval

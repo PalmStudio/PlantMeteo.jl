@@ -10,6 +10,13 @@ PlantMeteo. [`Weather`](@ref) is simply `TimeStepTable{Atmosphere}`.
 Use `TimeStepTable` directly when you want PlantMeteo's table behavior without necessarily framing
 the data as weather, or when building custom timestep tables backed by your own row type.
 
+All rows have one explicit table schema. `Atmosphere` rows are aligned to the
+stable union of their properties, with `missing` inserted where an optional
+forcing was absent on a row. Other row types must already expose identical
+ordered keys; heterogeneous schemas are rejected instead of silently using the
+first row's keys. `push!` and `append!` accept only the table's existing schema;
+rebuild the table when a new column must be introduced.
+
 # Example
 
 ```julia
@@ -43,10 +50,64 @@ function TimeStepTable(names::NTuple{N,Symbol}, metadata::NamedTuple, ts::Vector
     TimeStepTable{T}(names, metadata, ts, _new_schema_cache(), _new_schema_cache_valid())
 end
 
-TimeStepTable(ts::V, metadata=NamedTuple()) where {V<:Vector} = TimeStepTable(keys(ts[1]), metadata, ts)
-TimeStepTable(ts::V, metadata=NamedTuple()) where {V<:Vector{<:AbstractDict}} = TimeStepTable((keys(ts[1])...,), metadata, ts)
+function TimeStepTable(ts::Vector{A}, metadata=NamedTuple()) where {A<:Atmosphere}
+    return _time_step_table_from_atmospheres(ts, metadata)
+end
+
+function _time_step_table_from_atmospheres(ts, metadata)
+    isempty(ts) && throw(ArgumentError("A TimeStepTable requires at least one row."))
+
+    names = Symbol[]
+    seen = Set{Symbol}()
+    for row in ts
+        for name in keys(row)
+            name in seen && continue
+            push!(seen, name)
+            push!(names, name)
+        end
+    end
+    names_tuple = Tuple(names)
+
+    if all(row -> Tuple(keys(row)) == names_tuple, ts)
+        return TimeStepTable(names_tuple, metadata, ts)
+    end
+
+    aligned = Atmosphere[]
+    sizehint!(aligned, length(ts))
+    for row in ts
+        values_ = Tuple(
+            hasproperty(row, name) ? getproperty(row, name) : missing
+            for name in names_tuple
+        )
+        push!(aligned, Atmosphere(NamedTuple{names_tuple}(values_)))
+    end
+    return TimeStepTable(names_tuple, metadata, aligned)
+end
+
+function TimeStepTable(ts::V, metadata=NamedTuple()) where {V<:Vector}
+    isempty(ts) && throw(ArgumentError("A TimeStepTable requires at least one row."))
+
+    if all(row -> row isa Atmosphere, ts)
+        atmospheres = Atmosphere[row for row in ts]
+        return _time_step_table_from_atmospheres(atmospheres, metadata)
+    end
+
+    names = Tuple(Symbol.(keys(ts[1])))
+    for (index, row) in enumerate(ts)
+        row_names = Tuple(Symbol.(keys(row)))
+        row_names == names || throw(ArgumentError(
+            "All non-Atmosphere TimeStepTable rows must use the same ordered keys; row $index has $row_names, expected $names.",
+        ))
+    end
+    return TimeStepTable(names, metadata, ts)
+end
 
 # If the metadata is a Dict, we convert it to a NamedTuple
+function TimeStepTable(ts::Vector{A}, metadata::D) where {A<:Atmosphere,D<:Dict}
+    md = NamedTuple(zip(Symbol.(keys(metadata)), values(metadata)))
+    TimeStepTable(ts, md)
+end
+
 function TimeStepTable(ts::V, metadata::D) where {V<:Vector,D<:Dict}
     md = NamedTuple(zip(Symbol.(keys(metadata)), values(metadata)))
     TimeStepTable(ts, md)
@@ -649,13 +710,43 @@ end
 
 # Pushing and appending to a TimeStepTable object:
 function Base.push!(ts::TimeStepTable, x)
-    push!(getfield(ts, :ts), x)
-    update_schema_cache_for_new_rows!(ts, (x,))
+    converted = _prepare_appended_row(ts, x)
+    push!(getfield(ts, :ts), converted)
+    update_schema_cache_for_new_rows!(ts, (converted,))
+    return ts
 end
 
 function Base.append!(ts::TimeStepTable, x)
-    append!(getfield(ts, :ts), x)
-    update_schema_cache_for_new_rows!(ts, x)
+    # Materialize and convert once before mutation. This keeps append! atomic
+    # and supports stateful iterators that cannot be traversed twice.
+    converted = similar(getfield(ts, :ts), 0)
+    for row in x
+        push!(converted, _prepare_appended_row(ts, row))
+    end
+    append!(getfield(ts, :ts), converted)
+    update_schema_cache_for_new_rows!(ts, converted)
+    return ts
+end
+
+function _prepare_appended_row(ts::TimeStepTable, row)
+    _validate_appended_row_schema(ts, row)
+    storage_type = eltype(getfield(ts, :ts))
+    try
+        return convert(storage_type, row)
+    catch err
+        throw(ArgumentError(
+            "Cannot store a row of type $(typeof(row)) in this TimeStepTable's Vector{$storage_type}; rebuild the table so its row type can represent every row. Conversion failed with $(typeof(err)).",
+        ))
+    end
+end
+
+function _validate_appended_row_schema(ts::TimeStepTable, row)
+    expected = getfield(ts, :names)
+    actual = Tuple(Symbol.(keys(row)))
+    actual == expected || throw(ArgumentError(
+        "Cannot add a row with keys $actual to a TimeStepTable with schema $expected; rebuild the table to form an explicit union schema.",
+    ))
+    return nothing
 end
 
 const DEFAULT_RICH_DISPLAY_ROW_COUNT = 20

@@ -16,10 +16,11 @@ file = joinpath(dirname(dirname(pathof(PlantMeteo))), "test", "data", "meteo.csv
 weather = read_weather(
     file,
     :temperature => :T,
-    :relativeHumidity => (x -> x ./ 100) => :Rh,
+    :relativeHumidity => :Rh,
     :wind => :Wind,
     :atmosphereCO2_ppm => :Cₐ,
-    date_format = DateFormat("yyyy/mm/dd")
+    date_format = DateFormat("yyyy/mm/dd"),
+    input_units = (Rh=:percent,)
 )
 
 write_weather("weather_out.csv", weather)
@@ -65,10 +66,11 @@ file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
 w = read_weather(
     file,
     :temperature => :T,
-    :relativeHumidity => (x -> x ./100) => :Rh,
+    :relativeHumidity => :Rh,
     :wind => :Wind,
     :atmosphereCO2_ppm => :Cₐ,
-    date_format = DateFormat("yyyy/mm/dd")
+    date_format = DateFormat("yyyy/mm/dd"),
+    input_units = (Rh=:percent,)
 )
 
 df = prepare_weather(w)
@@ -111,10 +113,11 @@ file = joinpath(dirname(dirname(pathof(PlantMeteo))),"test","data","meteo.csv")
 w = read_weather(
     file,
     :temperature => :T,
-    :relativeHumidity => (x -> x ./100) => :Rh,
+    :relativeHumidity => :Rh,
     :wind => :Wind,
     :atmosphereCO2_ppm => :Cₐ,
-    date_format = DateFormat("yyyy/mm/dd")
+    date_format = DateFormat("yyyy/mm/dd"),
+    input_units = (Rh=:percent,)
 )
 
 df = select_weather(w)
@@ -136,13 +139,8 @@ function select_weather(w, vars=setdiff(propertynames(w), ATMOSPHERE_COMPUTED))
     for var in requested_vars
         hasproperty(w, var) || continue
 
-        col = Tables.getcolumn(w, var)
-        if vars !== nothing && all(==(Inf), col)
-            continue
-        end
-
         push!(selected_vars, var)
-        push!(selected_cols, col)
+        push!(selected_cols, Tables.getcolumn(w, var))
     end
 
     # Build the table from selected columns only to avoid materializing all columns first.

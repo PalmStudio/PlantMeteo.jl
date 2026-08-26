@@ -21,6 +21,8 @@ for metadata, and column transformations follow the familiar `source => transfor
   durations from the full table when no `duration` column exists; a vector is used as-is; any other
   value is repeated for every row.
 - `forward_fill_date`: when `true`, fills missing `date` cells with the previous non-missing date before combining with `hour_start`.
+- `input_units`: explicit units for canonical `Rh` and `P` columns. Use
+  `(Rh=:percent, P=:hPa)` for a percent/hPa source. No unit is inferred from values.
 
 # Transform patterns
 
@@ -31,9 +33,12 @@ for metadata, and column transformations follow the familiar `source => transfor
 # Important behavior
 
 - file variables are used as provided unless you transform them
-- units must already match PlantMeteo's canonical units
+- units are canonical unless a non-canonical source is declared with `input_units`
 - if `duration` is not provided, PlantMeteo can infer it from `date`, `hour_start`, and `hour_end`
 - legacy files with sparse date columns can be handled with `forward_fill_date=true`
+- YAML metadata values are preserved as read; column transformations never parse or rename metadata
+- normalization provenance is appended to the YAML-safe
+  `import_normalization` metadata history without discarding earlier records
 
 # Example
 
@@ -45,10 +50,11 @@ file = joinpath(dirname(dirname(pathof(PlantMeteo))), "test", "data", "meteo.csv
 weather = read_weather(
     file,
     :temperature => :T,
-    :relativeHumidity => (x -> x ./ 100) => :Rh,
+    :relativeHumidity => :Rh,
     :wind => :Wind,
     :atmosphereCO2_ppm => :Cₐ,
-    date_format = DateFormat("yyyy/mm/dd")
+    date_format = DateFormat("yyyy/mm/dd"),
+    input_units = (Rh=:percent,)
 )
 ```
 """
@@ -59,6 +65,7 @@ function read_weather(
     hour_format=Dates.DateFormat("HH:MM:SS"),
     duration=nothing,
     forward_fill_date::Bool=false,
+    input_units=(Rh=:fraction, P=:kPa),
 )
 
     arguments = (args...,)
@@ -74,7 +81,11 @@ function read_weather(
     # Rename the columns to the PlantMeteo convention (if any):
     data = standardize_columns!(ToPlantMeteoColumns(), data)
 
-    return Weather(data, (; zip(Symbol.(keys(metadata_)), values(metadata_))...))
+    normalized = normalize_weather_import(data; input_units)
+    source_metadata = (; zip(Symbol.(keys(metadata_)), values(metadata_))...)
+    metadata = _append_weather_import_provenance(source_metadata, normalized.provenance)
+
+    return Weather(normalized.data, metadata)
 end
 
 function _compute_date_with_fallback(data, date_format, date_formats, hour_format; forward_fill_date::Bool=false)
@@ -163,7 +174,11 @@ function read_weather_(file)
         while is_yaml
             line = readline(io, keep=true)
             if line[1:2] == "#'"
-                yaml_data *= lstrip(line[3:end])
+                payload = line[3:end]
+                # Human-authored headers often put one separator space after
+                # `#'`. Remove only that separator; YAML indentation below the
+                # top level is semantic and must survive write/read round trips.
+                yaml_data *= startswith(payload, " ") ? chop(payload; head=1, tail=0) : payload
             else
                 is_yaml = false
             end
@@ -171,7 +186,10 @@ function read_weather_(file)
         return yaml_data
     end
 
-    metadata_ = length(yaml_data) > 0 ? YAML.load(yaml_data) : Dict()
+    metadata_ = isempty(strip(yaml_data)) ? Dict{String,Any}() : YAML.load(yaml_data)
+    metadata_ isa AbstractDict || throw(ArgumentError(
+        "Weather metadata must be a YAML mapping, got $(typeof(metadata_)).",
+    ))
     push!(metadata_, "file" => file)
 
     met_data = Tables.columntable(CSV.File(file; comment="#"))
