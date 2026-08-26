@@ -19,7 +19,9 @@ var_names = Dict(:temperature => :T, :relativeHumidity => :Rh, :wind => :Wind, :
         "name" => "Aquiares",
         "latitude" => 15.0,
         "altitude" => 100.0,
-        "use" => [:clearness],
+        # Metadata stays exactly as supplied even though the data column is
+        # renamed from Re_SW_f to Ri_SW_f above.
+        "use" => "Re_SW_f, clearness",
         "file" => file,
     )
 

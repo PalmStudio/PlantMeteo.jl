@@ -86,6 +86,11 @@ metadata(weather)
 ```
 
 This is useful for keeping site information, provenance, or source notes attached to the weather series.
+PlantMeteo preserves metadata values from imported files without interpreting
+them. Column transformations apply only to table columns: they never parse or
+rename metadata values. Downstream code may interpret a metadata key only when
+that behavior is part of its documented API; otherwise the value remains source
+provenance.
 
 ## Variables And Units
 

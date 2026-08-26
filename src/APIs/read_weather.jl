@@ -74,32 +74,6 @@ function read_weather(
     # Rename the columns to the PlantMeteo convention (if any):
     data = standardize_columns!(ToPlantMeteoColumns(), data)
 
-    # If there's a "use" field in the YAML, parse it and rename it:
-    if haskey(metadata_, "use")
-        # Old format (deprecated, but used by ARCHIMED) uses "use" => "clearness, test"
-        # instead of a proper YAML list. So we have to parse it:
-        if isa(metadata_["use"], String)
-            splitted_use = split(metadata_["use"], r"[,\s]")
-            metadata_["use"] = Symbol.(splitted_use[findall(x -> length(x) > 0, splitted_use)])
-        end
-
-        replacements = Pair{Symbol,Symbol}[]
-        for i in arguments
-            i isa Pair || continue
-            new_name =
-                if i.second isa Pair
-                    i.second.second
-                elseif i.second isa Symbol
-                    i.second
-                else
-                    i.first
-                end
-            push!(replacements, i.first => new_name)
-        end
-        length(replacements) > 0 && replace!(metadata_["use"], replacements...)
-    end
-    # NB: the "use" field is not used in PlantMeteo, but it is still correctly parsed.
-
     return Weather(data, (; zip(Symbol.(keys(metadata_)), values(metadata_))...))
 end
 

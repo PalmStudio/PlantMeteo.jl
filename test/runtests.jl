@@ -33,10 +33,6 @@ using Documenter # for doctests
         include("test-TimeStepTable.jl")
     end
 
-    # @testset "transform" begin
-    #     include("test-transform.jl")
-    # end
-
     @testset "Generic meteo API" begin
         include("test-genericAPI.jl")
     end
