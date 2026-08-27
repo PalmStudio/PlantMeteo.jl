@@ -8,7 +8,7 @@ weather = get_weather(48.8566, 2.3522, period; api = PlantMeteo.DemoAPI())
 weather[1:4]</code></pre><table>
   <thead>
     <tr class = "title">
-      <td colspan = "23" style = "font-size: x-large; font-weight: bold; text-align: center;">TimeStepTable{Atmosphere{(:date, :duration,...}(4 x 22):</td>
+      <td colspan = "18" style = "font-size: x-large; font-weight: bold; text-align: center;">TimeStepTable{Atmosphere{(:date, :duration,...}(4 x 17):</td>
     </tr>
     <tr class = "columnLabelRow">
       <th class = "stubheadLabel" style = "font-weight: bold; text-align: right;"></th>
@@ -28,22 +28,12 @@ weather[1:4]</code></pre><table>
       <th style = "font-weight: bold; text-align: right;">γ</th>
       <th style = "font-weight: bold; text-align: right;">ε</th>
       <th style = "font-weight: bold; text-align: right;">Δ</th>
-      <th style = "font-weight: bold; text-align: right;">clearness</th>
       <th style = "font-weight: bold; text-align: right;">Ri_SW_f</th>
-      <th style = "font-weight: bold; text-align: right;">Ri_PAR_f</th>
-      <th style = "font-weight: bold; text-align: right;">Ri_NIR_f</th>
-      <th style = "font-weight: bold; text-align: right;">Ri_TIR_f</th>
-      <th style = "font-weight: bold; text-align: right;">Ri_custom_f</th>
     </tr>
     <tr class = "columnLabelRow">
       <th class = "stubheadLabel" style = "font-weight: bold; text-align: right;"></th>
       <th style = "text-align: right;">DateTime</th>
       <th style = "text-align: right;">Hour</th>
-      <th style = "text-align: right;">Float64</th>
-      <th style = "text-align: right;">Float64</th>
-      <th style = "text-align: right;">Float64</th>
-      <th style = "text-align: right;">Float64</th>
-      <th style = "text-align: right;">Float64</th>
       <th style = "text-align: right;">Float64</th>
       <th style = "text-align: right;">Float64</th>
       <th style = "text-align: right;">Float64</th>
@@ -80,12 +70,7 @@ weather[1:4]</code></pre><table>
       <td style = "text-align: right;">0.0672368</td>
       <td style = "text-align: right;">0.584806</td>
       <td style = "text-align: right;">0.145734</td>
-      <td style = "text-align: right;">Inf</td>
       <td style = "text-align: right;">0.0</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
     </tr>
     <tr class = "dataRow">
       <td class = "rowLabel" style = "font-weight: bold; text-align: right;">2</td>
@@ -105,12 +90,7 @@ weather[1:4]</code></pre><table>
       <td style = "text-align: right;">0.0673208</td>
       <td style = "text-align: right;">0.585956</td>
       <td style = "text-align: right;">0.156273</td>
-      <td style = "text-align: right;">Inf</td>
       <td style = "text-align: right;">0.0</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
     </tr>
     <tr class = "dataRow">
       <td class = "rowLabel" style = "font-weight: bold; text-align: right;">3</td>
@@ -130,12 +110,7 @@ weather[1:4]</code></pre><table>
       <td style = "text-align: right;">0.0673992</td>
       <td style = "text-align: right;">0.586667</td>
       <td style = "text-align: right;">0.166668</td>
-      <td style = "text-align: right;">Inf</td>
       <td style = "text-align: right;">0.0</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
     </tr>
     <tr class = "dataRow">
       <td class = "rowLabel" style = "font-weight: bold; text-align: right;">4</td>
@@ -155,12 +130,7 @@ weather[1:4]</code></pre><table>
       <td style = "text-align: right;">0.0674667</td>
       <td style = "text-align: right;">0.586972</td>
       <td style = "text-align: right;">0.176056</td>
-      <td style = "text-align: right;">Inf</td>
       <td style = "text-align: right;">0.0</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
     </tr>
   </tbody>
 </table>
@@ -174,7 +144,7 @@ Metadata: `Dict{String, Any}("latitude" => 48.8566, "source" => "demo-api", "lon
  22.5</code></pre><p>The table also has metadata keys that describe the site and the source of the data:</p><pre><code class="language-julia hljs">metadatakeys(weather)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(&quot;latitude&quot;, &quot;longitude&quot;, &quot;source&quot;)</code></pre><h2 id="3.-Aggregate-To-One-Row-Per-Day"><a class="docs-heading-anchor" href="#3.-Aggregate-To-One-Row-Per-Day">3. Aggregate To One Row Per Day</a><a id="3.-Aggregate-To-One-Row-Per-Day-1"></a><a class="docs-heading-anchor-permalink" href="#3.-Aggregate-To-One-Row-Per-Day" title="Permalink"></a></h2><p>You can use <a href="../reference/#PlantMeteo.to_daily"><code>to_daily</code></a> when you want to aggregate infra-day data into a standard daily weather table with one row per civil day.</p><pre><code class="language-julia hljs">daily = to_daily(weather)</code></pre><table>
   <thead>
     <tr class = "title">
-      <td colspan = "27" style = "font-size: x-large; font-weight: bold; text-align: center;">TimeStepTable{Atmosphere{(:date, :duration,...}(2 x 26):</td>
+      <td colspan = "22" style = "font-size: x-large; font-weight: bold; text-align: center;">TimeStepTable{Atmosphere{(:date, :duration,...}(2 x 21):</td>
     </tr>
     <tr class = "columnLabelRow">
       <th class = "stubheadLabel" style = "font-weight: bold; text-align: right;"></th>
@@ -194,12 +164,7 @@ Metadata: `Dict{String, Any}("latitude" => 48.8566, "source" => "demo-api", "lon
       <th style = "font-weight: bold; text-align: right;">γ</th>
       <th style = "font-weight: bold; text-align: right;">ε</th>
       <th style = "font-weight: bold; text-align: right;">Δ</th>
-      <th style = "font-weight: bold; text-align: right;">clearness</th>
       <th style = "font-weight: bold; text-align: right;">Ri_SW_f</th>
-      <th style = "font-weight: bold; text-align: right;">Ri_PAR_f</th>
-      <th style = "font-weight: bold; text-align: right;">Ri_NIR_f</th>
-      <th style = "font-weight: bold; text-align: right;">Ri_TIR_f</th>
-      <th style = "font-weight: bold; text-align: right;">Ri_custom_f</th>
       <th style = "font-weight: bold; text-align: right;">year</th>
       <th style = "font-weight: bold; text-align: right;">dayofyear</th>
       <th style = "font-weight: bold; text-align: right;">Tmin</th>
@@ -209,11 +174,6 @@ Metadata: `Dict{String, Any}("latitude" => 48.8566, "source" => "demo-api", "lon
       <th class = "stubheadLabel" style = "font-weight: bold; text-align: right;"></th>
       <th style = "text-align: right;">Date</th>
       <th style = "text-align: right;">Day</th>
-      <th style = "text-align: right;">Float64</th>
-      <th style = "text-align: right;">Float64</th>
-      <th style = "text-align: right;">Float64</th>
-      <th style = "text-align: right;">Float64</th>
-      <th style = "text-align: right;">Float64</th>
       <th style = "text-align: right;">Float64</th>
       <th style = "text-align: right;">Float64</th>
       <th style = "text-align: right;">Float64</th>
@@ -254,12 +214,7 @@ Metadata: `Dict{String, Any}("latitude" => 48.8566, "source" => "demo-api", "lon
       <td style = "text-align: right;">0.0672376</td>
       <td style = "text-align: right;">0.583441</td>
       <td style = "text-align: right;">0.148012</td>
-      <td style = "text-align: right;">Inf</td>
       <td style = "text-align: right;">17.7741</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
       <td style = "text-align: right;">2025</td>
       <td style = "text-align: right;">182</td>
       <td style = "text-align: right;">15.0</td>
@@ -283,12 +238,7 @@ Metadata: `Dict{String, Any}("latitude" => 48.8566, "source" => "demo-api", "lon
       <td style = "text-align: right;">0.0672895</td>
       <td style = "text-align: right;">0.587345</td>
       <td style = "text-align: right;">0.154521</td>
-      <td style = "text-align: right;">Inf</td>
       <td style = "text-align: right;">17.7741</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
-      <td style = "text-align: right;">Inf</td>
       <td style = "text-align: right;">2025</td>
       <td style = "text-align: right;">183</td>
       <td style = "text-align: right;">15.8</td>
@@ -302,7 +252,7 @@ Metadata: `Dict{String, Any}("latitude" => 48.8566, "source" => "demo-api", "lon
 <span class="sgr31">│</span>  00002, Cₐ=415.0, e=1.5027425702003174, eₛ=2.3964165011914402 ...            <span class="sgr31">│</span>
 <span class="sgr31">╰──────────────────────────────────────────────────────────────────────────────╯</span></code></pre><h2 id="4.-Sample-Weather-For-A-Model-Time-Window"><a class="docs-heading-anchor" href="#4.-Sample-Weather-For-A-Model-Time-Window">4. Sample Weather For A Model Time Window</a><a id="4.-Sample-Weather-For-A-Model-Time-Window-1"></a><a class="docs-heading-anchor-permalink" href="#4.-Sample-Weather-For-A-Model-Time-Window" title="Permalink"></a></h2><p>We can use <code>sample_weather</code> to sample weather for a model time window. This is useful when you have a model that runs on a different time step than the original data, or when you want to apply a custom reducer over a rolling window.</p><p>Let&#39;s say we have a model that runs on 24-hour time steps, and we want to sample weather for each 24-hour window. We can use <code>sample_weather</code> with a <code>RollingWindow</code> to do this:</p><pre><code class="language-julia hljs">prepared = prepare_weather_sampler(weather)
 window = RollingWindow(24.0)
-sampled = sample_weather(prepared, 24; window = window)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Atmosphere(date = DateTime(&quot;2025-07-01T23:00:00&quot;), duration = Millisecond(86400000), T = 20.0, Wind = 1.1999999999999997, P = 101.3, Rh = 0.6500000000000001, Precipitations = 1.2000000000000002, Cₐ = 415.0, e = 1.502742570200317, eₛ = 2.396416501191441, VPD = 0.8936739309911232, ρ = 1.203960293363366, λ = 2.453700000000001e6, γ = 0.0672375819269494, ε = 0.5834413910269151, Δ = 0.1480115968281549, clearness = Inf, Ri_SW_f = 205.71834055297288, Ri_PAR_f = Inf, Ri_NIR_f = Inf, Ri_TIR_f = Inf, Ri_custom_f = Inf, Rhmax = 0.8, Rhmin = 0.5, Ri_NIR_q = Inf, Ri_PAR_q = Inf, Ri_SW_q = 17.774064623776855, Ri_TIR_q = Inf, Ri_custom_q = Inf, Tmax = 25.0, Tmin = 15.0)</code></pre><p>The underlying data structure of <code>sampled</code> is the same as <code>weather</code>, but the values are now the result of applying the reducer (by default, <code>mean</code>) over each 24-hour window. Each row in <code>sampled</code> corresponds to a 24-hour window in the original data, and the variables are the aggregated values for that window. You can inspect the variables in <code>sampled</code> just like before, e.g. <code>sampled[1]</code> is the first sampled row, and <code>sampled[1].T</code> is the mean temperature over the first 24-hour window:</p><pre><code class="language-julia hljs">sampled</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Atmosphere(date = DateTime(&quot;2025-07-01T23:00:00&quot;), duration = Millisecond(86400000), T = 20.0, Wind = 1.1999999999999997, P = 101.3, Rh = 0.6500000000000001, Precipitations = 1.2000000000000002, Cₐ = 415.0, e = 1.502742570200317, eₛ = 2.396416501191441, VPD = 0.8936739309911232, ρ = 1.203960293363366, λ = 2.453700000000001e6, γ = 0.0672375819269494, ε = 0.5834413910269151, Δ = 0.1480115968281549, clearness = Inf, Ri_SW_f = 205.71834055297288, Ri_PAR_f = Inf, Ri_NIR_f = Inf, Ri_TIR_f = Inf, Ri_custom_f = Inf, Rhmax = 0.8, Rhmin = 0.5, Ri_NIR_q = Inf, Ri_PAR_q = Inf, Ri_SW_q = 17.774064623776855, Ri_TIR_q = Inf, Ri_custom_q = Inf, Tmax = 25.0, Tmin = 15.0)</code></pre><p>This sampled row is the aggregation of the previous 24 hourly timesteps:</p><pre><code class="language-julia hljs">mean(weather[i].T for i in 1:24)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20.0</code></pre><h2 id="5.-Switch-To-The-Real-Open-Meteo-Backend"><a class="docs-heading-anchor" href="#5.-Switch-To-The-Real-Open-Meteo-Backend">5. Switch To The Real Open-Meteo Backend</a><a id="5.-Switch-To-The-Real-Open-Meteo-Backend-1"></a><a class="docs-heading-anchor-permalink" href="#5.-Switch-To-The-Real-Open-Meteo-Backend" title="Permalink"></a></h2><p>The runnable examples above stay offline on purpose. In real use, replace <code>PlantMeteo.DemoAPI()</code> with <a href="../reference/#PlantMeteo.OpenMeteo"><code>OpenMeteo()</code></a> (which is the default):</p><pre><code class="language-julia hljs">using PlantMeteo, Dates
+sampled = sample_weather(prepared, 24; window = window)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Atmosphere(date = DateTime(&quot;2025-07-01T23:00:00&quot;), duration = Millisecond(86400000), T = 20.0, Wind = 1.1999999999999997, P = 101.3, Rh = 0.6500000000000001, Precipitations = 1.2000000000000002, Cₐ = 415.0, e = 1.502742570200317, eₛ = 2.396416501191441, VPD = 0.8936739309911232, ρ = 1.203960293363366, λ = 2.453700000000001e6, γ = 0.0672375819269494, ε = 0.5834413910269151, Δ = 0.1480115968281549, Ri_SW_f = 205.71834055297288, Rhmax = 0.8, Rhmin = 0.5, Ri_SW_q = 17.774064623776855, Tmax = 25.0, Tmin = 15.0)</code></pre><p>The underlying data structure of <code>sampled</code> is the same as <code>weather</code>, but the values are now the result of applying the reducer (by default, <code>mean</code>) over each 24-hour window. Each row in <code>sampled</code> corresponds to a 24-hour window in the original data, and the variables are the aggregated values for that window. You can inspect the variables in <code>sampled</code> just like before, e.g. <code>sampled[1]</code> is the first sampled row, and <code>sampled[1].T</code> is the mean temperature over the first 24-hour window:</p><pre><code class="language-julia hljs">sampled</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">Atmosphere(date = DateTime(&quot;2025-07-01T23:00:00&quot;), duration = Millisecond(86400000), T = 20.0, Wind = 1.1999999999999997, P = 101.3, Rh = 0.6500000000000001, Precipitations = 1.2000000000000002, Cₐ = 415.0, e = 1.502742570200317, eₛ = 2.396416501191441, VPD = 0.8936739309911232, ρ = 1.203960293363366, λ = 2.453700000000001e6, γ = 0.0672375819269494, ε = 0.5834413910269151, Δ = 0.1480115968281549, Ri_SW_f = 205.71834055297288, Rhmax = 0.8, Rhmin = 0.5, Ri_SW_q = 17.774064623776855, Tmax = 25.0, Tmin = 15.0)</code></pre><p>This sampled row is the aggregation of the previous 24 hourly timesteps:</p><pre><code class="language-julia hljs">mean(weather[i].T for i in 1:24)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">20.0</code></pre><h2 id="5.-Switch-To-The-Real-Open-Meteo-Backend"><a class="docs-heading-anchor" href="#5.-Switch-To-The-Real-Open-Meteo-Backend">5. Switch To The Real Open-Meteo Backend</a><a id="5.-Switch-To-The-Real-Open-Meteo-Backend-1"></a><a class="docs-heading-anchor-permalink" href="#5.-Switch-To-The-Real-Open-Meteo-Backend" title="Permalink"></a></h2><p>The runnable examples above stay offline on purpose. In real use, replace <code>PlantMeteo.DemoAPI()</code> with <a href="../reference/#PlantMeteo.OpenMeteo"><code>OpenMeteo()</code></a> (which is the default):</p><pre><code class="language-julia hljs">using PlantMeteo, Dates
 
 period = Date(2025, 7, 1):Day(1):Date(2025, 7, 3)
-weather = get_weather(48.8566, 2.3522, period; api=OpenMeteo())</code></pre><h2 id="Next-Steps"><a class="docs-heading-anchor" href="#Next-Steps">Next Steps</a><a id="Next-Steps-1"></a><a class="docs-heading-anchor-permalink" href="#Next-Steps" title="Permalink"></a></h2><ul><li><a href="../getting-weather-data/">Getting Weather Data</a>: API retrieval and file ingestion</li><li><a href="../open-meteo/">Open-Meteo Guide</a>: why Open-Meteo is useful and what tradeoffs apply</li><li><a href="../daily-aggregation/">Daily Aggregation</a>: when <code>to_daily</code> is enough</li><li><a href="../weather-sampling/">Weather Sampling</a>: when you need rolling/calendar windows or custom reducers</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../getting-weather-data/">Getting Weather Data »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 6 August 2026 07:55">Thursday 6 August 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+weather = get_weather(48.8566, 2.3522, period; api=OpenMeteo())</code></pre><h2 id="Next-Steps"><a class="docs-heading-anchor" href="#Next-Steps">Next Steps</a><a id="Next-Steps-1"></a><a class="docs-heading-anchor-permalink" href="#Next-Steps" title="Permalink"></a></h2><ul><li><a href="../getting-weather-data/">Getting Weather Data</a>: API retrieval and file ingestion</li><li><a href="../open-meteo/">Open-Meteo Guide</a>: why Open-Meteo is useful and what tradeoffs apply</li><li><a href="../daily-aggregation/">Daily Aggregation</a>: when <code>to_daily</code> is enough</li><li><a href="../weather-sampling/">Weather Sampling</a>: when you need rolling/calendar windows or custom reducers</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../getting-weather-data/">Getting Weather Data »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Thursday 27 August 2026 20:34">Thursday 27 August 2026</span>. Using Julia version 1.12.7.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
