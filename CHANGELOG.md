@@ -2,7 +2,7 @@
 
 This file records the notable user-facing changes in PlantMeteo.
 
-## [0.9.0] - Unreleased
+## [0.9.0]
 
 PlantMeteo 0.9.0 makes weather-data boundaries explicit. Imported values are
 normalized from declared units, invalid atmospheric inputs are reported instead
