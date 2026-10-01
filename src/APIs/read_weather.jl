@@ -192,7 +192,14 @@ function read_weather_(file)
     ))
     push!(metadata_, "file" => file)
 
-    met_data = Tables.columntable(CSV.File(file; comment="#"))
+    met_data = open(file, "r") do io
+        while !eof(io)
+            pos = position(io)
+            line = readline(io; keep=true)
+            startswith(line, "#") || (seek(io, pos); break)
+        end
+        Tables.columntable(CSV.File(io; comment="#"))
+    end
 
     (data=met_data, metadata_=metadata_)
 end
